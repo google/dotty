@@ -11,7 +11,7 @@
 /py27
 /build
 /dist
-/rekall.egg-info
+/efilter.egg-info
 
 # Xcode & OS X-related stuff
 .DS_Store
