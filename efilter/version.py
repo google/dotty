@@ -15,7 +15,15 @@
 # limitations under the License.
 
 """
-EFILTER versioning.
+EFILTER versioning scheme.
+
+EFILTER version is the UTC UNIX epoch of the git commit that the package is
+being built from. This allows us to disambiguate different builds of the same
+major version, and simply map each build back to the commit it came from.
+
+It would be more convenient to just use the git commitish as version strings,
+but PEP 0440 mandates that version numbers increment over time, which the
+commitish, being output of a hash function, doesn't.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
@@ -28,12 +36,17 @@ import subprocess
 
 
 def _unix_epoch(date):
+    """Convert datetime object to a UTC UNIX timestamp."""
     td =  date - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
     return int(td.total_seconds())
 
 
 def run_git_log():
-    """Generate version based on date of last commit."""
+    """Generate version based on date of last commit.
+
+    Returns:
+        UTC UNIX timestamp as int on success, or None.
+    """
     try:
         p = subprocess.Popen(
             ["git", "log", "-1", "--format=%cd", "--date=iso-strict"],
@@ -45,7 +58,7 @@ def run_git_log():
     except (OSError, IndexError):
         # Even if git log fails (because it's not in a git repo), the call may
         # still 'succeed' as far as subprocess.Popen is concerned, hence the
-        # IndexError exception. No, I don't know why Python sometimes ignores
+        # IndexError exception. I don't know why Python sometimes ignores
         # the return code.
         return None
 
@@ -64,10 +77,12 @@ def get_pkg_version():
 
 
 def get_version():
-    """Get a version string as date of last commit or else parse PKG-INFO.
+    """Tries to get the EFILTER version from git or PKG-INFO.
+
+    The EFILTER version is the UTC UNIX epoch of latest git commit.
 
     Example:
-        2015.07.10
+        1438623992
     """
     version = run_git_log()
     if version:
