@@ -1,5 +1,5 @@
 from efilter import expression
-from efilter import testlib
+from efilter_tests import testlib
 
 
 class NormalizerTest(testlib.EngineTestCase):

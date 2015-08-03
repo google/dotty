@@ -1,4 +1,4 @@
-from efilter import testlib
+from efilter_tests import testlib
 
 from efilter.protocols import boolean
 from efilter.protocols import number

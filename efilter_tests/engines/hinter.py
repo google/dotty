@@ -1,4 +1,4 @@
-from efilter import testlib
+from efilter_tests import testlib
 
 
 class HinterTest(testlib.EngineTestCase):

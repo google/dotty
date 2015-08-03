@@ -10,7 +10,7 @@ setup(name="efilter",
       author="Adam Sindelar",
       author_email="adam.sindelar@gmail.com",
       url="https://github.com/google/dotty/",
-      packages=find_packages(exclude=["tests*"]),
+      packages=find_packages(exclude=["efilter_tests*"]),
       package_dir={"efilter": "efilter"},
       install_requires=[
           "python-dateutil > 2",
