@@ -28,39 +28,46 @@ commitish, being output of a hash function, doesn't.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import datetime
-from dateutil import parser
-import pytz
+
 import re
-import subprocess
 
+try:
+    import datetime
+    import pytz
+    import subprocess
 
-def _unix_epoch(date):
-    """Convert datetime object to a UTC UNIX timestamp."""
-    td =  date - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
-    return int(td.total_seconds())
+    # The below functionality is only available if dateutil is installed.
+    from dateutil import parser
 
+    def _unix_epoch(date):
+        """Convert datetime object to a UTC UNIX timestamp."""
+        td =  date - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
+        return int(td.total_seconds())
 
-def run_git_log():
-    """Generate version based on date of last commit.
+    def run_git_log():
+        """Generate version based on date of last commit.
 
-    Returns:
-        UTC UNIX timestamp as int on success, or None.
-    """
-    try:
-        p = subprocess.Popen(
-            ["git", "log", "-1", "--format=%cd", "--date=iso-strict"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
-        p.stderr.close()
-        output = p.stdout.readlines()[0]
-        date = parser.parse(output)
-        return _unix_epoch(date)
-    except (OSError, IndexError):
-        # Even if git log fails (because it's not in a git repo), the call may
-        # still 'succeed' as far as subprocess.Popen is concerned, hence the
-        # IndexError exception. I don't know why Python sometimes ignores
-        # the return code.
-        return None
+        Returns:
+            UTC UNIX timestamp as int on success, or None.
+        """
+        try:
+            p = subprocess.Popen(
+                ["git", "log", "-1", "--format=%cd", "--date=iso-strict"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+            p.stderr.close()
+            output = p.stdout.readlines()[0]
+            date = parser.parse(output)
+            return _unix_epoch(date)
+        except (OSError, IndexError):
+            # Even if git log fails (because it's not in a git repo), the call
+            # may still 'succeed' as far as subprocess.Popen is concerned,
+            # hence the IndexError exception. I don't know why Python sometimes
+            # ignores the return code.
+            return None
+except ImportError:
+    # If there's no dateutil then doing the git tango is pointless.
+    def run_git_log():
+        pass
 
 
 def get_pkg_version():
