@@ -28,28 +28,46 @@ class EfilterError(Exception):
     start = None
     end = None
 
-    def __init__(self, query, message, root=None, start=None, end=None):
+    def __init__(self, query=None, message=None, root=None, start=None,
+                 end=None):
         super(EfilterError, self).__init__(message)
 
         self.query = query
         self.message = message
         self.root = root
-        self.start = start if start is not None else self.root.start
-        self.end = end if end is not None else self.root.end
+
+        if self.root:
+            self.start = self.root.start
+            self.end = self.root.end
+
+        if start is not None:
+            self.start = start
+
+        if end is not None:
+            self.end = end
+
+    @property
+    def text(self):
+        return self.message
+
+    @property
+    def source(self):
+        if not self.query:
+            return None
+
+        if self.start is not None and self.end is not None:
+            return "%s >>> %s <<< %s" % (
+                self.query[0:self.start],
+                self.query[self.start:self.end],
+                self.query[self.end:])
+        elif self.query:
+            return self.query
 
     def __str__(self):
-        if self.start is not None and self.end is not None:
-            query = "%s >>> %s <<< %s" % (
-                self.query.source[0:self.start],
-                self.query.source[self.start:self.end],
-                self.query.source[self.end:])
-        else:
-            query = self.query.source
-
         return "%s (%s) in query %r" % (
             type(self).__name__,
-            self.message,
-            query)
+            self.text,
+            self.source)
 
     def __repr__(self):
         return "%s(message=%r, start=%r, end=%r)" % (
@@ -60,7 +78,7 @@ class EfilterParseError(EfilterError):
     token = None
 
     def __init__(self, *args, **kwargs):
-        self.token = kwargs.pop("token")
+        self.token = kwargs.pop("token", None)
         super(EfilterParseError, self).__init__(*args, **kwargs)
 
 
@@ -68,12 +86,19 @@ class EfilterTypeError(EfilterError):
     expected = None
     actual = None
 
+    @property
+    def text(self):
+        if self.message:
+            return self.message
+
+        if self.expected and self.actual:
+            return "Expected type %r, got %r instead." % (self.expected,
+                                                          self.actual)
+
+        return None
+
     def __init__(self, *args, **kwargs):
         self.expected = kwargs.pop("expected")
         self.actual = kwargs.pop("actual")
-
-        if self.expected and self.actual:
-            kwargs.setdefault("message", "Expected type %r, got %r instead." %
-                              (self.expected, self.actual))
 
         super(EfilterTypeError, self).__init__(*args, **kwargs)

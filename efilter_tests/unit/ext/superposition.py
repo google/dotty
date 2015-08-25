@@ -15,21 +15,29 @@
 # limitations under the License.
 
 """
-EFILTER test helpers.
+EFILTER test suite.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import unittest
 
-from efilter import protocol
+from efilter.ext import superposition
 
 
-class EfilterTestCase(unittest.TestCase):
-    def assertImplemented(self, for_type, function):
-        self.assertTrue(function.implemented_for_type(for_type),
-                        "Polymorphic function %r is not implemented for %r." %
-                        (function, for_type))
+class SuperpositionTest(unittest.TestCase):
+    """This file only tests the specifities of ext.superpositions.
 
-    def assertIsa(self, t, p):
-        self.assertTrue(protocol.isa(t, p))
+    efilter.protocols.test_superpositon has additional tests, based on the
+    generic protocol.
+    """
+
+    def testMutability(self):
+        """Test adding states."""
+        s = superposition.HashedSuperposition(1, 2, 3)
+        s.add_state(4)
+        self.assertEqual(sorted(s.getstates()), [1, 2, 3, 4])
+
+        # Adding another superposition should leave us flat.
+        s.add_state(superposition.HashedSuperposition(4, 5))
+        self.assertEqual(sorted(s.getstates()), [1, 2, 3, 4, 5])

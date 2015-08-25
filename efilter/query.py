@@ -21,101 +21,99 @@ EFILTER query wrapper.
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 
-from efilter import frontend
-from efilter import engine
-from efilter import expression
+from efilter import syntax as s
+from efilter import ast
+
+
+def guess_source_syntax(source):
+    if isinstance(source, ast.Expression):
+        return "expression"
+
+    if isinstance(source, basestring):
+        return "dotty"
+
+    if isinstance(source, tuple):
+        return "lisp"
+
+    return None
 
 
 class Query(object):
     source = None
     root = None
     syntax = None
+    application_delegate = None
+    params = None
 
-    def __init__(self, source, root=None, params=None, syntax="slashy",
+    def __init__(self, source, root=None, params=None, syntax=None,
                  application_delegate=None):
         super(Query, self).__init__()
-        self.application_delegate = application_delegate
-        self.syntax = syntax
 
-        # Run as a copy constructor.
         if isinstance(source, Query):
+            # Run as a copy constructor with optional overrides.
+            self.root = source.root
             self.source = source.source
-            self.root = root or source.root
-            self.application_delegate = (application_delegate
-                                         or source.application_delegate)
-            return
-
-        # No need to parse anything.
-        if root:
-            self.source = source
-            self.root = root
-            return
-
-        # This is here to support calling Query with a positional argument
-        # that's the root of the AST.
-        if isinstance(source, expression.Expression):
+            self.application_delegate = source.application_delegate
+            self.syntax = source.syntax
+            self.params = source.params
+        elif isinstance(source, ast.Expression):
+            # TODO: This will go away when other stops relying on it.
             self.root = source
-            return
-
-        # If we got here then source is actually a query and it's not been
-        # parsed, so we need to find the appropriate frontend parser and run it.
-        if self.syntax and self.syntax != "expression":
-            # We need to parse the query.
-            parser_cls = frontend.Frontend.get_frontend(syntax)
-            parser = parser_cls(original=source, params=params)
-            self.source = parser.original
-            self.root = parser.root
-
-            # Query is normalized by default because parsers are allowed to
-            # produce crazy AST and rely on the visitor engines to understand
-            # it.
-            self.root = self.run_engine("normalizer").root
         else:
-            raise TypeError("%r is not an expression.", source)
+            self.source = source
 
-    def subquery(self, node):
-        return type(self)(self, root=node)
+        # Override anything set by above code with explicit args.
+        if syntax is not None:
+            self.syntax = syntax
 
-    def locate_expression(self, node):
-        """Returns the original source of the expression with context.
+        if application_delegate is not None:
+            self.application_delegate = application_delegate
 
-        Returns tuple of:
-            - query up to the start of expression
-            - source of the expression
-            - the rest of the query
-        """
-        return node.start, node.end
+        if params is not None:
+            self.params = params
 
-    def source_expression(self, node):
-        if isinstance(self.source, basestring):
-            return self.source[node.start:node.end]
+        if root is not None:
+            if root != self.root:
+                self.source = None  # No longer valid.
+            self.root = root
 
-        return None
+        # Generate missing information.
+        if not self.source and not self.root:
+            raise ValueError("Must pass at least 'source' or 'root'.")
 
-    def run_engine(self, shorthand, **kwargs):
-        engine_cls = engine.Engine.get_engine(shorthand)
-        if engine_cls is None:
-            raise ValueError("No such engine %r." % shorthand)
+        if self.source and not self.root:
+            # Run parser to generate AST.
+            if not self.syntax:
+                self.syntax = guess_source_syntax(self.source)
 
-        return engine_cls(
-            query=self,
-            application_delegate=self.application_delegate).run(**kwargs)
+            parser_cls = s.Syntax.get_syntax(self.syntax)
+            if not parser_cls:
+                raise ValueError(
+                    "Cannot find parser for syntax %r. Source was %r." %
+                    (self.syntax, self.source))
+            parser = parser_cls(original=self.source, params=self.params)
+            self.root = parser.root
+        elif self.root and not self.source:
+            # Run formatter to generate the source.
+            if not self.syntax:
+                # Good, fully expressive default.
+                self.syntax = "dotty"
+
+            formatter = s.Syntax.get_formatter(self.syntax)
+            if not formatter:
+                # If we don't have a formatter for the explicit syntax, just
+                # generate at least /something/.
+                formatter = s.Syntax.get_formatter("dotty")
+            self.source = formatter(self.root)
 
     def __str__(self):
         return unicode(self)
 
     def __unicode__(self):
-        if self.source:
-            return unicode(self.source)
-
-        return unicode(self.root)
+        return unicode(self.source)
 
     def __repr__(self):
-        source = self.source_expression(self.root)
-        if not source:
-            source = self.root
-
-        return "Query(%r)" % source
+        return "Query(%s)" % repr(self.source)
 
     def __hash__(self):
         return hash(self.root)

@@ -21,9 +21,7 @@ This module implements a set-like container that supports multiple hashable
 elems per entry.
 """
 
-
 __author__ = "Adam Sindelar <adamsh@google.com>"
-
 
 from efilter.protocols import indexable
 
@@ -66,7 +64,7 @@ class IndexSet(object):
         if not indices:
             raise KeyError("%s elem is not in %s.", repr(elem), repr(self))
 
-        for index in elem.indices:
+        for index in indexable.indices(elem):
             del self._backing_dict[index]
 
         self._elem_count -= 1
@@ -93,7 +91,6 @@ class IndexSet(object):
     def get_index(self, index):
         return self._backing_dict.get(index)
 
-    @property
     def indices(self):
         return self._backing_dict.keys()
 
@@ -186,7 +183,7 @@ class IndexSet(object):
             seen |= indices
 
     def __eq__(self, other):
-        return sorted(self.indices) == sorted(other.indices)
+        return sorted(self.indices()) == sorted(other.indices())
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -224,4 +221,4 @@ class IndexSet(object):
     def __isub__(self, other):
         return self.difference_update(other)
 
-indexable.IIndexable.implemented(for_type=IndexSet)
+indexable.IIndexable.implicit_static(for_type=IndexSet)

@@ -15,21 +15,35 @@
 # limitations under the License.
 
 """
-EFILTER test helpers.
+EFILTER special syntaxes.
+
+Syntaxs in this module don't really implement a language - they're special
+cases for just passing through literals and stuff.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import unittest
+from efilter import ast
+from efilter import syntax
 
-from efilter import protocol
+
+class LiteralSyntax(syntax.Syntax):
+    """This is basically and identity function for literals."""
+
+    @property
+    def root(self):
+        return ast.Literal(self.original)
 
 
-class EfilterTestCase(unittest.TestCase):
-    def assertImplemented(self, for_type, function):
-        self.assertTrue(function.implemented_for_type(for_type),
-                        "Polymorphic function %r is not implemented for %r." %
-                        (function, for_type))
+syntax.Syntax.register_parser(LiteralSyntax, shorthand="literal")
 
-    def assertIsa(self, t, p):
-        self.assertTrue(protocol.isa(t, p))
+
+class PassthroughSyntax(syntax.Syntax):
+    """This is basically and identity function for expressions."""
+
+    @property
+    def root(self):
+        return self.original
+
+
+syntax.Syntax.register_parser(LiteralSyntax, shorthand="expression")

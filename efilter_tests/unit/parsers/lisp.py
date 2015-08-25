@@ -15,21 +15,26 @@
 # limitations under the License.
 
 """
-EFILTER test helpers.
+EFILTER test suite.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import unittest
 
-from efilter import protocol
+from efilter import ast
+from efilter.parsers import lisp
 
 
-class EfilterTestCase(unittest.TestCase):
-    def assertImplemented(self, for_type, function):
-        self.assertTrue(function.implemented_for_type(for_type),
-                        "Polymorphic function %r is not implemented for %r." %
-                        (function, for_type))
+class ParserTest(unittest.TestCase):
+    def assertQueryMatches(self, query, expected):
+        parser = lisp.Parser(query)
+        actual = parser.root
+        self.assertEqual(expected, actual)
 
-    def assertIsa(self, t, p):
-        self.assertTrue(protocol.isa(t, p))
+    def testBasic(self):
+        self.assertQueryMatches(
+            ("==", ("var", "foo"), "bar"),
+            ast.Equivalence(
+                ast.Binding("foo"),
+                ast.Literal("bar")))

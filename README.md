@@ -5,10 +5,10 @@ EFILTER is a general-purpose destructuring and search language implemented in Py
 ## Quick Example
 
 	query = Query("name == 'Bob' and age > (15 + 1)")
-	query.run_engine("matcher", dict(name="Alice", age=20)) # => False
-	query.run_engine("matcher", dict(name="Bob", age=20)) # => True
-	query.run_engine("infer_types") # => bool
-	Query("15 + 1").run_engine("infer_types") # => int
+	solve(query, dict(name="Alice", age=20)) # => False
+	solve(query, dict(name="Bob", age=20)) # => True
+	infer_type(query) # => bool
+	infer_type(Query("15 + 1")) # => int
 
 ## Integrating EFILTER with your project
 
@@ -60,7 +60,7 @@ be accessed:
 Now we can filter the Customer class:
 
 	query = Query("name == 'Bob'")
-	query.run_engine("matcher", bindings=Customer(name="Bob")) # => True
+	solve(query, Customer(name="Bob")) # => True
 
 ## License and Copyright
 

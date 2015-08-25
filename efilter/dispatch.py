@@ -28,6 +28,24 @@ import functools
 import threading
 
 
+def call_audit(func):
+    """Print a detailed audit of all calls to this function."""
+    def audited_func(*args, **kwargs):
+        import traceback
+        stack = traceback.extract_stack()
+        r = func(*args, **kwargs)
+        print "@depth %d, trace %s -> %s(*%r, **%r) => %r" % (
+            len(stack),
+            " -> ".join("%s:%d:%s" % x[0:3] for x in stack[-5:-2]),
+            func.func_name,
+            args,
+            kwargs,
+            r)
+        return r
+
+    return audited_func
+
+
 class polymorphic(object):
     """Polymorphic function that dispatches on the type of the first arg.
 
@@ -118,10 +136,7 @@ class polymorphic(object):
 
     def implemented_for_type(self, dispatch_type):
         candidate = self._find_and_cache_best_function(dispatch_type)
-        if candidate == self.func:
-            return False
-
-        return True
+        return candidate is not None
 
     def _preferred(self, preferred, over):
         prefs = self._prefer_table.get(preferred)
@@ -167,17 +182,17 @@ class polymorphic(object):
         Returns:
             Implementing function, in below order of preference:
             1. Explicitly registered implementations (through
-               polymorphic.register) for types that arg_type either is
+               polymorphic.implement) for types that 'dispatch_type' either is
                or inherits from directly.
             2. Explicitly registered implementations accepting an abstract type
                (interface) in which dispatch_type participates (through
-               abstract_type.register()).
+               abstract_type.register() or the convenience methods).
             3. Default behavior of the polymorphic function. This will usually
                raise a NotImplementedError, by convention.
 
         Raises:
             TypeError: If two implementing functions are registered for
-                different abstract types, and dispatch_type participates in
+                different abstract types, and 'dispatch_type' participates in
                 both, and no order of preference was specified using
                 prefer_type.
         """
@@ -232,6 +247,7 @@ class polymorphic(object):
                     else:
                         result = candidate_func
                         result_type = candidate_type
+                        best_match = match
 
                 if match < best_match:
                     result = candidate_func
@@ -242,6 +258,28 @@ class polymorphic(object):
             return result
         finally:
             self._write_lock.release()
+
+    def implementation(self, for_type):
+        """Return a decorator that will register the implementation.
+
+        Example:
+            @polymorphic
+            def add(x, y):
+                pass
+
+            @add.implementation(for_type=int)
+            def add(x, y):
+                return x + y
+
+            @add.implementation(for_type=SomeType)
+            def add(x, y):
+                return int(x) + int(y)
+        """
+        def _decorator(implementation):
+            self.implement(implementation, for_type)
+            return self
+
+        return _decorator
 
     def implement(self, implementation, for_type=None, for_types=None):
         """Registers an implementing function for for_type.

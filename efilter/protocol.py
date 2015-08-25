@@ -30,7 +30,7 @@ To participate in a protocol, two things are required:
 
 In this manner, we are able to declare strict compositional types on atoms and
 expressions in the EFILTER AST and allow type hierarchies external to EFILTER
-(Plaso Events, Rekall Entities) to be passed to the EFILTER engines without
+(Plaso Events, Rekall Entities) to be passed to the EFILTER transforms without
 casting or wrapping.
 
 The compositional, flat nature of the type protocols makes it simple to support
@@ -79,6 +79,10 @@ def isa(cls, protocol):
     """Does the type 'cls' participate in the 'protocol'?"""
     if not isinstance(cls, type):
         raise TypeError("First argument to isa must be a type. Got %r." % cls)
+
+    if not isinstance(protocol, type):
+        raise TypeError(("Second argument to isa must be a type or a Protocol. "
+                         "Got an instance of %r.") % type(protocol))
     return issubclass(cls, protocol) or issubclass(AnyType, protocol)
 
 
@@ -136,11 +140,85 @@ class Protocol(object):
         cls.implemented(for_type=for_type)
 
     @classmethod
+    def implicit_static(cls, for_type):
+        """Automatically generate implementations for a type.
+
+        Implement the protocol for the 'for_type' type by dispatching each
+        member function of the protocol to an instance method of the same name
+        declared on the type 'for_type'.
+
+        Arguments:
+            for_type: The type to implictly implement the protocol with.
+
+        Raises:
+            TypeError if not all implementations are provided by 'for_type'.
+        """
+        implementations = {}
+        for function in cls.functions():
+            method = getattr(for_type, function.func_name, None)
+            if not callable(method):
+                raise TypeError(
+                    "%s.implicit invokation on type %r is missing instance "
+                    "method %r." % (cls.__name__, for_type, function.func_name))
+
+            implementations[function] = method
+
+        return cls.implement(for_type=for_type, implementations=implementations)
+
+    @staticmethod
+    def _build_late_dispatcher(func_name):
+        """Return a function that calls method 'func_name' on objects.
+
+        This is useful for building late-bound dynamic dispatch.
+
+        Arguments:
+            func_name: The name of the instance method that should be called.
+
+        Returns:
+            A function that takes an 'obj' parameter, followed by *args and
+            returns the result of calling the instance method with the same
+            name as the contents of 'func_name' on the 'obj' object with the
+            arguments from *args.
+        """
+        def _late_dynamic_dispatcher(obj, *args):
+            method = getattr(obj, func_name, None)
+            if not callable(method):
+                raise NotImplementedError(
+                    "Instance method %r is not implemented by %r." % (
+                        func_name, obj))
+
+            return method(*args)
+
+        return _late_dynamic_dispatcher
+
+    @classmethod
+    def implicit_dynamic(cls, for_type):
+        """Automatically generate late dynamic dispatchers to type.
+
+        This is similar to 'implicit_static', except instead of binding the
+        instance methods, it generates a dispatcher that will call whatever
+        instance method of the same name happens to be available at time of
+        dispatch.
+
+        This has the obvious advantage of supporting arbitrary subclasses, but
+        can do no verification at bind time.
+
+        Arguments:
+            for_type: The type to implictly implement the protocol with.
+        """
+        implementations = {}
+        for function in cls.functions():
+            implementations[function] = cls._build_late_dispatcher(
+                func_name=function.func_name)
+
+        return cls.implement(for_type=for_type, implementations=implementations)
+
+    @classmethod
     def implement(cls, implementations, for_type=None, for_types=None):
         """Provide protocol implementation for a type.
 
         Register all implementations of polymorphic functions in this
-        protocol and adds the type into the abstract base class of the
+        protocol and add the type into the abstract base class of the
         protocol.
 
         Arguments:

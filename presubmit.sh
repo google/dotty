@@ -21,6 +21,7 @@ echo "Working directory is $(pwd)"
 
 for f in $( git diff master --name-only | grep ".py"); do
   if [ -e $f ]; then
+    echo $f
     autopep8 --ignore E309,E711 -i -r --max-line-length 80 $f
     pylint --rcfile pylintrc $f
   fi

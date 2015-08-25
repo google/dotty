@@ -29,7 +29,6 @@ from efilter import dispatch
 from efilter import protocol
 
 
-# Declarations:
 # pylint: disable=unused-argument
 
 
@@ -68,26 +67,6 @@ def reflect(delegate, name, scope=None):
         reflect(delegate, "_PsListHead") #=> proc
         reflect(delegate, "p_pid", proc) #=> unsigned
         reflect(delegate, "void_pointer", proc) #=> AnyType
-    """
-    raise NotImplementedError()
-
-
-@dispatch.polymorphic
-def asglobal(delegate, name, scope=None):
-    """Does the name (with scope) represent a global?
-
-    Arguments:
-        delegate: The application delegate.
-        name: The name to be reduced to global, if possible.
-        scope: The scope the name was found in.
-
-    Returns:
-        None if the name is not a global. Otherwise the global name.
-
-    Examples:
-        asglobal(delegate, "Process") #=> "Process"
-        asglobal(delegate, "name", Process) #=> None
-        asglobal(delegate, "Process", )
     """
     raise NotImplementedError()
 
