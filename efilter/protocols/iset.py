@@ -27,42 +27,42 @@ from efilter.protocols import eq
 # pylint: disable=unused-argument
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def union(x, y):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def intersection(x, y):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def difference(x, y):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def issuperset(x, y):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def issubset(x, y):
     return issuperset(y, x)
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def isstrictsuperset(x, y):
     return issuperset(x, y) and eq.ne(x, y)
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def isstrictsubset(x, y):
     return isstrictsuperset(y, x)
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def contains(s, e):
     raise NotImplementedError()
 

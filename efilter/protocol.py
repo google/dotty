@@ -49,7 +49,7 @@ class AnyType(object):
     If you need to provide a default implementation of functions in a
     protocol (for example, providing fall-through behavior for objects that
     don't participate in the protocol) you may pass this type in place of
-    'object'. This will cause the polymorphic functions to fall through to
+    'object'. This will cause the multimethod functions to fall through to
     this default implementation, but won't cause 'object' to be a subclass
     of the protocol.
 
@@ -116,7 +116,7 @@ class Protocol(object):
 
     @classmethod
     def _implement_for_type(cls, for_type, implementations):
-        # AnyType is a sentinel that means the polymorphic function should
+        # AnyType is a sentinel that means the multimethod function should
         # just dispatch on 'object'.
         dispatch_type = object if for_type is AnyType else for_type
         protocol_functions = cls.functions()
@@ -217,13 +217,13 @@ class Protocol(object):
     def implement(cls, implementations, for_type=None, for_types=None):
         """Provide protocol implementation for a type.
 
-        Register all implementations of polymorphic functions in this
+        Register all implementations of multimethod functions in this
         protocol and add the type into the abstract base class of the
         protocol.
 
         Arguments:
             implementations: A dict of (function, implementation), where each
-                function is polymorphic and each implementation is a callable.
+                function is multimethod and each implementation is a callable.
             for_type: The concrete type implementations apply to.
             for_types: Same as for_type, but takes a tuple of types.
 
@@ -233,7 +233,7 @@ class Protocol(object):
             ValueError for arguments.
             TypeError if not all implementations are provided or if there
                 are issues related to polymorphism (e.g. attempting to
-                implement a non-polymorphic function.
+                implement a non-multimethod function.
         """
         if for_type:
             if for_types:

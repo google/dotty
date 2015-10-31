@@ -35,101 +35,107 @@ from efilter.protocols import number
 class InferTypeTest(testlib.EfilterTestCase):
     def testQuery(self):
         """Get coverage test to shut up."""
-        pass
 
     def testBinding(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("Process.pid"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             int)
 
     def testLiteral(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("42"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             number.INumber)
 
     def testBinding(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("foo"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             protocol.AnyType)
 
     def testEquivalence(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("Process.name == 'init'"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             boolean.IBoolean)
 
     def testComplement(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("not Process.name"),
-                mocks.MockApp()),
-            boolean.IBoolean)
-
-    def testComponentLiteral(self):
-        self.assertIsa(
-            infer_type.infer_type(
-                q.Query("has component Process"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             boolean.IBoolean)
 
     def testIsInstance(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("isa Process"),
-                mocks.MockApp()),
+                q.Query("proc isa Process"),
+                mocks.MockRootType),
             boolean.IBoolean)
 
     def testBinaryExpression(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("'foo' in ('bar', 'foo')"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             boolean.IBoolean)
 
-    def testLetAny(self):
+    def testAny(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("any Process.parent where (name == 'init')"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             boolean.IBoolean)
 
-    def testLetEach(self):
+    def testEach(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("any Process.children where (name == 'init')"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             boolean.IBoolean)
 
     def testVariadicExpression(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("5 + 5"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             number.INumber)
 
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("10 * (1 - 4) / 5"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             number.INumber)
 
-    def testLet(self):
+    def testFilter(self):
+        self.assertIsa(
+            infer_type.infer_type(
+                q.Query("find Process where (parent.pid == 10)"),
+                mocks.MockRootType),
+            mocks.Process)
+
+    def testSort(self):
+        self.assertIsa(
+            infer_type.infer_type(
+                q.Query("sort Process where (parent.pid)"),
+                mocks.MockRootType),
+            mocks.Process)
+
+    def testMap(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("Process.parent where (pid + 10)"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             number.INumber)
 
         # Should be the same using shorthand syntax.
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("Process.parent.pid - 1"),
-                mocks.MockApp()),
+                mocks.MockRootType),
             number.INumber)

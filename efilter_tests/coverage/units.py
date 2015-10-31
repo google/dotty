@@ -26,6 +26,7 @@ from efilter.transforms import hint
 from efilter.transforms import infer_type
 from efilter.transforms import normalize
 from efilter.transforms import solve
+from efilter.transforms import validate
 
 from efilter_tests.unit.transforms import analyse as analyse_test
 from efilter_tests.unit.transforms import asdotty as asdotty_test
@@ -33,6 +34,7 @@ from efilter_tests.unit.transforms import hint as hint_test
 from efilter_tests.unit.transforms import infer_type as infer_type_test
 from efilter_tests.unit.transforms import normalize as normalize_test
 from efilter_tests.unit.transforms import solve as solve_test
+from efilter_tests.unit.transforms import validate as validate_test
 
 from efilter_tests import testlib
 
@@ -68,3 +70,6 @@ class UnitCoverageTest(testlib.EfilterTestCase):
 
     def testSolveCoverage(self):
         self.assertUnitCoverage(solve.solve, solve_test.SolveTest)
+
+    def testValidateCoverage(self):
+        self.assertUnitCoverage(validate.validate, validate_test.ValidateTest)

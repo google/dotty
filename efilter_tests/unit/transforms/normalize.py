@@ -64,9 +64,9 @@ class NormalizeTest(testlib.EfilterTestCase):
             query.Query(ast.Literal(True)),
             normalize.normalize(query.Query(("&", True))))
 
-    def testLetEach(self):
+    def testWithin(self):
         original = query.Query(
-            ("let-each",
+            ("each",
              ("var", "parent"),
              ("var", "name")))
 
@@ -74,49 +74,48 @@ class NormalizeTest(testlib.EfilterTestCase):
             original,
             normalize.normalize(original))
 
-    def testLetAny(self):
         original = query.Query(
-            ("let-any",
-             ("let", ("var", "Process"), ("var", "parent")),
+            ("any",
+             ("map", ("var", "Process"), ("var", "parent")),
              ("==", ("var", "name"), "init")))
 
         self.assertEqual(
             original,
             normalize.normalize(original))
 
-    def testLet(self):
+    def testMap(self):
         original = ("&",
-                    ("let",
-                     ("let", ("var", "MemoryDescriptor"), ("var", "process")),
+                    ("map",
+                     ("map", ("var", "MemoryDescriptor"), ("var", "process")),
                      ("==",
-                      ("let", ("var", "Process"), ("var", "command")),
+                      ("map", ("var", "Process"), ("var", "command")),
                       "Adium")),
                     ("&",
                      ("in", "execute",
-                      ("let",
+                      ("map",
                        ("var", "MemoryDescriptor"),
                        ("var", "permissions"))),
                      ("in", "write",
-                      ("let",
+                      ("map",
                        ("var", "MemoryDescriptor"),
                        ("var", "permissions")))))
 
         # Two binary intersections become one variadic intersection and the
-        # let-forms now have a Binding as their LHS whenever possible.
+        # map-forms now have a Binding as their LHS whenever possible.
         expected = ("&",
-                    ("let",
+                    ("map",
                      ("var", "MemoryDescriptor"),
-                     ("let",
+                     ("map",
                       ("var", "process"),
                       ("==",
-                       ("let", ("var", "Process"), ("var", "command")),
+                       ("map", ("var", "Process"), ("var", "command")),
                        "Adium"))),
                     ("in", "execute",
-                     ("let",
+                     ("map",
                       ("var", "MemoryDescriptor"),
                       ("var", "permissions"))),
                     ("in", "write",
-                     ("let",
+                     ("map",
                       ("var", "MemoryDescriptor"),
                       ("var", "permissions"))))
 

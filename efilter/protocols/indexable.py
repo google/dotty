@@ -26,7 +26,7 @@ from efilter.protocols import hashable
 # pylint: disable=unused-argument
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def indices(x):
     """Return a list of keys to represent 'self' in maps.
 

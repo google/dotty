@@ -26,38 +26,52 @@ from efilter import ast
 from efilter import protocol
 from efilter import query as q
 
-from efilter.protocols import associative
 from efilter.protocols import boolean
-from efilter.protocols import name_delegate
+from efilter.protocols import reflective
 
 
-@dispatch.polymorphic
-def infer_type(expr, app_delegate, scope=None):
-    """Determines the types of each subexpression and validates sanity."""
-    _ = expr, app_delegate, scope
+@dispatch.multimethod
+def infer_type(expr, scope=None):
+    """Determine the return type of 'expr'.
+
+    If 'expr' is evaluated with solve, what will be the type of the result?
+
+    This employes two strategies to determine the types:
+    1) Some expression types have a return signature that never changes. For
+    example, intersection (AND) or unions (OR) always return a boolean.
+    2) For types that are dependent on values (such as variables or user
+    functions), IReflective.reflect is run on the 'scope' argument.
+
+    Arguments:
+        expr: The expression or query to infer return type of.
+        scope (OPTIONAL): A type that implements IReflective.
+
+    Returns:
+        A type, if known. On failure or in undecidable cases, returns AnyType.
+    """
+    _ = expr, scope
     raise NotImplementedError()
 
 
 @infer_type.implementation(for_type=q.Query)
-def infer_type(query, app_delegate, scope=None):
+def infer_type(query, scope=None):
     try:
-        return infer_type(query.root, app_delegate, scope)
+        return infer_type(query.root, scope)
     except errors.EfilterError as error:
         error.query = query.source
         raise
 
 
 @infer_type.implementation(for_type=ast.Literal)
-def infer_type(expr, app_delegate, scope):
-    _ = app_delegate, scope
+def infer_type(expr, scope):
+    _ = scope
     return type(expr.value)
 
 
 @infer_type.implementation(for_type=ast.Binding)
-def infer_type(expr, app_delegate, scope):
-    # If the app delegate implements INameDelegate then we can ask it for types.
-    if protocol.implements(app_delegate, name_delegate.INameDelegate):
-        result = name_delegate.reflect(app_delegate, expr.value, scope)
+def infer_type(expr, scope):
+    if scope:
+        result = reflective.reflect(scope, expr.value)
 
         if result:
             return result
@@ -66,86 +80,57 @@ def infer_type(expr, app_delegate, scope):
 
 
 @infer_type.implementation(for_type=ast.Complement)
-def infer_type(expr, app_delegate, scope):
-    t = infer_type(expr.value, app_delegate, scope)
+def infer_type(expr, scope):
+    t = infer_type(expr.value, scope)
     if not protocol.isa(t, boolean.IBoolean):
         raise errors.EfilterTypeError(root=expr,
                                       actual=t,
                                       expected=boolean.IBoolean)
 
-    return bool
-
-
-@infer_type.implementation(for_type=ast.ComponentLiteral)
-def infer_type(expr, app_delegate, scope):
-    _ = expr, app_delegate, scope
     return bool
 
 
 @infer_type.implementation(for_type=ast.IsInstance)
-def infer_type(expr, app_delegate, scope):
-    _ = expr, app_delegate, scope
+def infer_type(expr, scope):
+    _ = expr, scope
     return bool
 
 
 @infer_type.implementation(for_type=ast.BinaryExpression)
-def infer_type(expr, app_delegate, scope):
-    lhs_type = infer_type(expr.lhs, app_delegate, scope)
-    if not protocol.isa(lhs_type, expr.type_signature[0]):
-        raise errors.EfilterTypeError(root=expr.lhs,
-                                      expected=expr.type_signature[0],
-                                      actual=lhs_type)
-
-    rhs_type = infer_type(expr.rhs, app_delegate, scope)
-    if not protocol.isa(rhs_type, expr.type_signature[1]):
-        raise errors.EfilterTypeError(root=expr.rhs,
-                                      expected=expr.type_signature[1],
-                                      actual=rhs_type)
-
+def infer_type(expr, scope):
+    _ = scope
     return expr.return_signature
 
 
 @infer_type.implementation(for_type=ast.VariadicExpression)
-def infer_type(expr, app_delegate, scope):
-    for subexpr in expr.children:
-        t = infer_type(subexpr, app_delegate, scope)
-        if not protocol.isa(t, expr.type_signature):
-            raise errors.EfilterTypeError(root=subexpr,
-                                          expected=expr.type_signature,
-                                          actual=t)
-
+def infer_type(expr, scope):
+    _ = scope
     return expr.return_signature
 
 
-@infer_type.implementation(for_type=ast.Let)
-def infer_type(expr, app_delegate, scope):
-    t = infer_type(expr.context, app_delegate, scope)
-    if not (t is protocol.AnyType
-            or protocol.isa(t, associative.IAssociative)):
-        raise errors.EfilterTypeError(root=expr,
-                                      actual=t,
-                                      expected=associative.IAssociative)
-
-    return infer_type(expr.expression, app_delegate, t)
+@infer_type.implementation(for_type=ast.Map)
+def infer_type(expr, scope):
+    t = infer_type(expr.context, scope)
+    return infer_type(expr.expression, t)
 
 
-@infer_type.implementation(for_type=ast.LetAny)
-def infer_type(expr, app_delegate, scope):
-    t = infer_type(expr.context, app_delegate, scope)
-    if not protocol.isa(t, boolean.IBoolean):
-        raise errors.EfilterTypeError(root=expr,
-                                      actual=t,
-                                      expected=boolean.IBoolean)
+@infer_type.implementation(for_type=ast.Filter)
+def infer_type(expr, scope):
+    return infer_type(expr.lhs, scope)
 
+
+@infer_type.implementation(for_type=ast.Sort)
+def infer_type(expr, scope):
+    return infer_type(expr.lhs, scope)
+
+
+@infer_type.implementation(for_type=ast.Any)
+def infer_type(expr, scope):
+    _ = expr, scope
     return bool
 
 
-@infer_type.implementation(for_type=ast.LetEach)
-def infer_type(expr, app_delegate, scope):
-    t = infer_type(expr, app_delegate, scope)
-    if not protocol.isa(t, boolean.IBoolean):
-        raise errors.EfilterTypeError(root=expr,
-                                      actual=t,
-                                      expected=boolean.IBoolean)
-
+@infer_type.implementation(for_type=ast.Each)
+def infer_type(expr, scope):
+    _ = expr, scope
     return bool

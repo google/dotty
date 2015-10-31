@@ -44,7 +44,7 @@ def __build_operator_lookup(*tables):
 TOKENS = __build_operator_lookup(dotty.INFIX, dotty.PREFIX)
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def asdotty(expr):
     """Produces equivalent Dotty output to the AST.
 
@@ -62,7 +62,7 @@ def asdotty(query):
     return asdotty(query.root)
 
 
-@asdotty.implementation(for_type=ast.Let)
+@asdotty.implementation(for_type=ast.Within)
 def asdotty(expr):
     lhs = expr.lhs
     rhs = expr.rhs
@@ -71,26 +71,26 @@ def asdotty(expr):
     token = "."
 
     if not isinstance(expr.lhs, (ast.ValueExpression,
-                                 ast.Let)):
+                                 ast.Within)):
         left = "(%s)" % left
         token = " where "
 
     if not isinstance(expr.rhs, (ast.ValueExpression,
-                                 ast.Let)):
+                                 ast.Within)):
         right = "(%s)" % right
         token = " where "
 
     return token.join((left, right))
 
 
-@asdotty.implementation(for_type=ast.LetAny)
+@asdotty.implementation(for_type=ast.Any)
 def asdotty(expr):
-    return "any %s" % asdotty(ast.Let(expr.lhs, expr.rhs))
+    return "any %s" % asdotty(ast.Within(expr.lhs, expr.rhs))
 
 
-@asdotty.implementation(for_type=ast.LetEach)
+@asdotty.implementation(for_type=ast.Each)
 def asdotty(expr):
-    return "each %s" % asdotty(ast.Let(expr.lhs, expr.rhs))
+    return "each %s" % asdotty(ast.Within(expr.lhs, expr.rhs))
 
 
 @asdotty.implementation(for_type=ast.Literal)
@@ -111,7 +111,7 @@ def asdotty(expr):
         return "%s != %s" % (asdotty(child.children[0]),
                              asdotty(child.children[1]))
 
-    if isinstance(child, (ast.Let, ast.Binding,
+    if isinstance(child, (ast.Within, ast.Binding,
                           ast.Literal)):
         return "not %s" % asdotty(child)
 
@@ -137,13 +137,3 @@ def asdotty(expr):
         return separator.join(asdotty(x) for x in expr.children)
     except KeyError:
         return "<subexpression cannot be formatted as dotty>"
-
-
-@asdotty.implementation(for_type=ast.ComponentLiteral)
-def asdotty(expr):
-    return "has component %s" % expr.value
-
-
-@asdotty.implementation(for_type=ast.IsInstance)
-def asdotty(expr):
-    return "isa %s" % expr.value

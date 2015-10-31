@@ -23,24 +23,55 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 import collections
 
 from efilter.protocols import associative
-from efilter.protocols import name_delegate
+from efilter.protocols import reflective
 
 
-Process = collections.namedtuple("Process", ["pid", "name", "parent"])
-_proc = collections.namedtuple("_proc", ["p_pid", "p_comm", "p_ppid"])
+class Process(collections.namedtuple("Process", ["pid", "name", "parent"])):
+    @classmethod
+    def reflect(cls, name):
+        return PROCESS_DEFS.get(name)
+
+    @classmethod
+    def getkeys(cls):
+        return PROCESS_DEFS.keys()
+
+
+PROCESS_DEFS = {
+    "pid": int,
+    "name": unicode,
+    "parent": Process}
+
+
+class _proc(collections.namedtuple("_proc", ["p_pid", "p_comm", "p_ppid"])):
+    @classmethod
+    def reflect(cls, name):
+        return PROCESS_DEFS.get(name)
+
+    @classmethod
+    def getkeys(cls):
+        return PROCESS_DEFS.keys()
+
+
+PROC_DEFS = {
+    "p_pid": int,
+    "p_comm": unicode,
+    "p_ppid": int}
 
 
 associative.IAssociative.implement(
     for_types=(Process, _proc),
     implementations={
         associative.select: lambda x, k: getattr(x, k, None),
-        associative.resolve: lambda x, k: getattr(x, k, None),
-        associative.getkeys: dir
+        associative.resolve: lambda x, k: getattr(x, k, None)
     }
 )
 
 
-class MockApp(object):
+reflective.IReflective.implicit_dynamic(Process)
+reflective.IReflective.implicit_dynamic(_proc)
+
+
+class MockRootType(object):
     DEFS = {
         "Process": {
             "_": Process,
@@ -61,30 +92,19 @@ class MockApp(object):
         "_current_proc": _proc(2, "foo", 1),
     }
 
-    def reflect(self, name, scope=None):
-        if scope is None:
-            scope = name
-            name = "_"
-        elif isinstance(scope, type):
-            scope = scope.__name__
+    @classmethod
+    def reflect(cls, name):
+        if name == "Process":
+            return Process
 
-        return self.DEFS.get(scope, {}).get(name)
+        if name == "_proc":
+            return _proc
 
-    def provide(self, name):
-        return self.GLOBALS.get(name)
+        return None
 
-    def getnames(self, scope=None):
-        if scope:
-            return self.DEFS.get(scope).keys()
-
-        return self.DEFS.keys()
+    @classmethod
+    def getkeys(cls):
+        return ("Process", "_proc")
 
 
-name_delegate.INameDelegate.implement(
-    for_type=MockApp,
-    implementations={
-        name_delegate.reflect: MockApp.reflect,
-        name_delegate.provide: MockApp.provide,
-        name_delegate.getnames: MockApp.getnames,
-    }
-)
+reflective.IReflective.implicit_dynamic(MockRootType)

@@ -35,7 +35,7 @@ Analysis = collections.namedtuple("Analysis",
                                   ("symbols", "eq_indexables"))
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def analyse(query, scope=None):
     """This is a rule-driven analyzer that gets a list of symbols and indexing.
 
@@ -72,18 +72,6 @@ def analyse(expr, scope=None):
     return Analysis((), ())
 
 
-@analyse.implementation(for_type=ast.ComponentLiteral)
-def analyse(expr, scope=None):
-    _ = scope
-    return Analysis((expr.value,), ())
-
-
-@analyse.implementation(for_type=ast.IsInstance)
-def analyse(expr, scope=None):
-    _ = scope
-    return Analysis((expr.value,), ())
-
-
 @analyse.implementation(for_type=ast.BinaryExpression)
 def analyse(expr, scope=None):
     lhsa = analyse(expr.lhs, scope)
@@ -107,14 +95,14 @@ def analyse(expr, scope=None):
     return Analysis(symbols, eq_indexables)
 
 
-@analyse.implementation(for_type=ast.Let)
+@analyse.implementation(for_type=ast.Within)
 def analyse(expr, scope=None):
     if not isinstance(expr.lhs, ast.Binding):
         # Technically, the LHS context can be anything that implements
         # IAssociative, so a literal, or a subexpression that evaluates to
         # one are possible. Unfortunately, when that happens it is
         # non-trivial (read hard (read impossible)) to correctly determine
-        # the scope for the RHS of the Let-form.
+        # the scope for the RHS of the within-form.
         #
         # As this is the case, we are unable to create any hints, and
         # any symbols in the RHS expression are bound to an anonymous scope
@@ -167,20 +155,20 @@ def analyse(expr, scope=None):
         elif isinstance(child, ast.Binding):
             indexables.add(child.value)
             symbols.add(child.value)
-        elif isinstance(child, ast.Let):
-            # If we get a let-form, follow down as long as RHS is another
+        elif isinstance(child, ast.Within):
+            # If we get a within-form, follow down as long as RHS is another
             # left form and the LHS is a binding. (something like
             # foo.bar.baz)
-            let = child
+            within = child
             path = []
-            while (isinstance(let, ast.Let)
-                   and isinstance(let.lhs, ast.Binding)):
-                path.append(let.lhs.value)
+            while (isinstance(within, ast.Within)
+                   and isinstance(within.lhs, ast.Binding)):
+                path.append(within.lhs.value)
                 symbols.add(".".join(path))
-                let = let.rhs
+                within = within.rhs
 
-            if isinstance(let, ast.Binding):
-                path.append(let.value)
+            if isinstance(within, ast.Binding):
+                path.append(within.value)
 
             remainder = analyse(child, scope)
             symbols.update(remainder.symbols)

@@ -23,6 +23,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 from efilter import ast
 from efilter import query as q
 
+from efilter.protocols import repeated
 from efilter.protocols import superposition
 
 from efilter.transforms import solve
@@ -38,146 +39,158 @@ class SolveTest(testlib.EfilterTestCase):
 
     def testLiteral(self):
         self.assertEqual(
-            solve.solve(q.Query("42"), {}, None).value,
+            solve.solve(q.Query("42"), {}).value,
             42)
 
     def testBinding(self):
         self.assertEqual(
-            solve.solve(q.Query("foo"), {"foo": "bar"}, None).value,
+            solve.solve(q.Query("foo"), {"foo": "bar"}).value,
             "bar")
 
-    def testLet(self):
+    def testMap(self):
         self.assertEqual(
             solve.solve(
-                q.Query("foo.bar"), {"foo": {"bar": "baz"}}, None).value,
+                q.Query("foo.bar"), {"foo": {"bar": "baz"}}).value,
             "baz")
 
-    def testLetEach(self):
+    def testEach(self):
         self.assertEqual(
             solve.solve(
                 q.Query("each Process.parent where (pid == 1)"),
                 {"Process": {"parent": superposition.superposition(
                     mocks.Process(1, None, None),
-                    mocks.Process(2, None, None))}},
-                None).value,
+                    mocks.Process(2, None, None))}}).value,
             False)
 
-    def testLetAny(self):
+    def testAny(self):
         self.assertEqual(
             solve.solve(
                 q.Query("any Process.parent where (pid == 1)"),
                 {"Process": {"parent": superposition.superposition(
                     mocks.Process(1, None, None),
-                    mocks.Process(2, None, None))}},
-                None).value,
+                    mocks.Process(2, None, None))}}).value,
             True)
 
-    def testComponentLiteral(self):
-        """This really isn't testable outside Rekall."""
-        # TODO: This is a legacy piece of the AST that's going away soon.
-        # Rekall, which currently relies on it, will be able to use IsInstance.
+    def testSort(self):
+        self.assertEqual(
+            solve.solve(
+                q.Query("sort Process where pid"),
+                {"Process": repeated.meld(
+                    mocks.Process(2, None, None),
+                    mocks.Process(1, None, None))}).value,
+            repeated.meld(
+                mocks.Process(1, None, None),
+                mocks.Process(2, None, None)))
+
+        # How about nested repeated fields? This should sort the process
+        # children and return those.
+        self.assertEqual(
+            solve.solve(
+                q.Query("Process.(sort children where pid)"),
+                {"Process": {"children": repeated.meld(
+                    mocks.Process(2, None, None),
+                    mocks.Process(1, None, None))}}).value,
+            repeated.meld(
+                mocks.Process(1, None, None),
+                mocks.Process(2, None, None)))
+
+    def testFilter(self):
+        self.assertEqual(
+            solve.solve(
+                q.Query("find Process where (pid == 1)"),
+                {"Process": repeated.meld(
+                    mocks.Process(2, None, None),
+                    mocks.Process(1, None, None))}).value,
+            mocks.Process(1, None, None))
 
     def testIsInstance(self):
         self.assertEqual(
             solve.solve(
-                q.Query("isa Process"),
-                mocks.Process(None, None, None),
-                mocks.MockApp()).value,
+                q.Query("proc isa Process"),
+                {"proc": mocks.Process(None, None, None)}).value,
             True)
 
     def testComplement(self):
         self.assertEqual(
             solve.solve(
                 q.Query("not pid"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             False)
 
     def testIntersection(self):
         self.assertEqual(
             solve.solve(
                 q.Query("pid and not pid"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             False)
 
     def testUnion(self):
         self.assertEqual(
             solve.solve(
                 q.Query("pid or not pid"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             True)
 
     def testSum(self):
         self.assertEqual(
             solve.solve(
                 q.Query("pid + 10 + 20"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             31)
 
     def testDifference(self):
         self.assertEqual(
             solve.solve(
                 q.Query("(10 - pid) + 5"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             14)
 
     def testProduct(self):
         self.assertEqual(
             solve.solve(
                 q.Query("5 * 5 * 5"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             125)
 
     def testQuotient(self):
         self.assertEqual(
             solve.solve(
                 q.Query("10.0 / 4"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             2.5)
 
     def testEquivalence(self):
         self.assertEqual(
             solve.solve(
                 q.Query("pid == 1"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             True)
 
     def testMembership(self):
         self.assertEqual(
             solve.solve(
                 q.Query("pid in (1, 2)"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             True)
 
     def testRegexFilter(self):
         self.assertTrue(
             solve.solve(
                 q.Query("name =~ 'ini.*'"),
-                mocks.Process(1, "initd", None),
-                mocks.MockApp()).value)
+                mocks.Process(1, "initd", None)).value)
 
     def testStrictOrderedSet(self):
         self.assertEqual(
             solve.solve(
                 q.Query("pid > 2"),
-                mocks.Process(1, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(1, None, None)).value,
             False)
 
     def testPartialOrderedSet(self):
         self.assertEqual(
             solve.solve(
                 q.Query("pid >= 2"),
-                mocks.Process(2, None, None),
-                mocks.MockApp()).value,
+                mocks.Process(2, None, None)).value,
             True)
 
     def testContainmentOrder(self):
@@ -188,15 +201,14 @@ class SolveTest(testlib.EfilterTestCase):
                     ast.ContainmentOrder(
                         ast.Literal((1, 2)),
                         ast.Literal((1, 2, 3)))),
-                None, None).value,
+                None).value,
             True)
 
     def testMatchTrace(self):
         """Make sure that matching branch is recorded where applicable."""
         result = solve.solve(
             q.Query("pid == 1 or pid == 2 or pid == 3"),
-            mocks.Process(2, None, None),
-            mocks.MockApp())
+            mocks.Process(2, None, None))
 
         self.assertEquals(
             q.Query(result.branch),
@@ -204,7 +216,7 @@ class SolveTest(testlib.EfilterTestCase):
 
     def testDestructuring(self):
         result = solve.solve(
-            q.Query("Process.pid == 1"), {"Process": {"pid": 1}}, None)
+            q.Query("Process.pid == 1"), {"Process": {"pid": 1}})
         self.assertEqual(True, result.value)
 
         # Using a let-any form should succeed even if there is only one linked
@@ -212,14 +224,12 @@ class SolveTest(testlib.EfilterTestCase):
         result = solve.solve(
             q.Query("any Process.parent where (Process.pid == 1 or "
                     "Process.command == 'foo')"),
-            {"Process": {"parent": {"Process": {"pid": 1}}}},
-            None)
+            {"Process": {"parent": {"Process": {"pid": 1}}}})
         self.assertEqual(True, result.value)
 
     def testTypeOps(self):
         result = solve.solve(
-            q.Query("isa Process"),
-            mocks.Process(None, None, None),
-            mocks.MockApp())
+            q.Query("proc isa Process"),
+            {"proc": mocks.Process(None, None, None)})
 
         self.assertEqual(True, result.value)

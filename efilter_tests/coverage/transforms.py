@@ -28,6 +28,7 @@ from efilter.transforms import hint
 from efilter.transforms import infer_type
 from efilter.transforms import normalize
 from efilter.transforms import solve
+from efilter.transforms import validate
 
 from efilter_tests import testlib
 
@@ -59,3 +60,6 @@ class TransformCoverageTest(testlib.EfilterTestCase):
 
     def testSolveCoverage(self):
         self.assertASTCoverage(solve.solve)
+
+    def testValidateCoverage(self):
+        self.assertASTCoverage(validate.validate)

@@ -25,7 +25,7 @@ from efilter import protocol
 # pylint: disable=unused-argument
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def asbool(x):
     raise NotImplementedError()
 

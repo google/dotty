@@ -23,7 +23,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 class EfilterError(Exception):
     query = None
-    root = None
+    _root = None
     message = None
     start = None
     end = None
@@ -36,15 +36,26 @@ class EfilterError(Exception):
         self.message = message
         self.root = root
 
-        if self.root:
-            self.start = self.root.start
-            self.end = self.root.end
-
         if start is not None:
             self.start = start
 
         if end is not None:
             self.end = end
+
+    @property
+    def root(self):
+        return self._root
+
+    @root.setter
+    def root(self, value):
+        self._root = value
+
+        try:
+            self.start = value.start
+            self.end = value.end
+        except AttributeError:
+            self.start = None
+            self.end = None
 
     @property
     def text(self):
@@ -74,12 +85,35 @@ class EfilterError(Exception):
             type(self), self.message, self.start, self.end)
 
 
+class EfilterNoneError(EfilterError):
+    pass
+
+
 class EfilterParseError(EfilterError):
     token = None
 
     def __init__(self, *args, **kwargs):
         self.token = kwargs.pop("token", None)
         super(EfilterParseError, self).__init__(*args, **kwargs)
+
+
+class EfilterKeyError(EfilterError):
+    key = None
+
+    @property
+    def text(self):
+        if self.message:
+            return self.message
+
+        if self.key:
+            return "No key %r." % self.key
+
+        return None
+
+    def __init__(self, *args, **kwargs):
+        self.expected = kwargs.pop("key")
+
+        super(EfilterKeyError, self).__init__(*args, **kwargs)
 
 
 class EfilterTypeError(EfilterError):

@@ -26,7 +26,7 @@ from efilter import ast
 from efilter import query as q
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def normalize(expr):
     """Optimizes the AST for better performance and simpler structure.
 
@@ -40,18 +40,18 @@ def normalize(expr):
         Intersection("foo", Intersection("bar", "baz")) # becomes:
         Intersection("foo", "bar", "baz")
 
-        # Let-forms are rotated so that the LHS is a Binding when possible:
-        Let(
-            Let(
+        # Map-forms are rotated so that the LHS is a Binding when possible:
+        Map(
+            Map(
                 Binding("Process"),
                 Binding("parent")),
             Equivalence(
                 Binding("name"),
                 Literal("init")))
         # Becomes:
-        Let(
+        Map(
             Binding("Process"),
-            Let(
+            Map(
                 Binding("parent"),
                 Equivalence(
                     Binding("name"),
@@ -72,21 +72,21 @@ def normalize(expr):
     return expr
 
 
-@normalize.implementation(for_type=ast.Let)
+@normalize.implementation(for_type=ast.Map)
 def normalize(expr):
-    """Rotate repeated let-forms so they cascade on the RHS.
+    """Rotate nested map-forms so they cascade on the RHS.
 
-    Basic let-forms should be rotated as follows:
-    (let (let x y) (...)) => (let x (let y) (...))
+    Basic map-forms should be rotated as follows:
+    (map (map x y) (...)) => (map x (map y) (...))
 
     These are functionally equivalent, but the latter is easier to follow.
 
-    Returns rotated Let instance.
+    Returns rotated Map instance.
     """
     lhs = normalize(expr.lhs)
     rhs = normalize(expr.rhs)
 
-    if (isinstance(lhs, ast.Let)
+    if (isinstance(lhs, ast.Map)
             and isinstance(lhs.lhs, ast.Binding)):
         lhs_ = lhs.lhs
         rhs = type(expr)(lhs.rhs, rhs, start=lhs.rhs.start, end=rhs.end)
@@ -95,19 +95,12 @@ def normalize(expr):
     return type(expr)(lhs, rhs, start=lhs.start, end=rhs.end)
 
 
-@normalize.implementation(for_type=ast.LetAny)
+@normalize.implementation(for_type=ast.Within)
 def normalize(expr):
-    """let-any|let-each forms are not cascaded.
+    """any, each, filter and sort are not cascaded.
 
     This is basically a pass-through function.
     """
-    lhs = normalize(expr.lhs)
-    rhs = normalize(expr.rhs)
-    return type(expr)(lhs, rhs, start=lhs.start, end=rhs.end)
-
-
-@normalize.implementation(for_type=ast.LetEach)
-def normalize(expr):
     lhs = normalize(expr.lhs)
     rhs = normalize(expr.rhs)
     return type(expr)(lhs, rhs, start=lhs.start, end=rhs.end)

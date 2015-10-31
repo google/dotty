@@ -32,17 +32,17 @@ from efilter import protocol
 # pylint: disable=unused-argument
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def provide(provider, query=None, params=None):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def declare_output(provider, query=None):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def declare_input(provider, query=None):
     raise NotImplementedError()
 

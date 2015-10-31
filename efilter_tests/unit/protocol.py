@@ -26,13 +26,13 @@ from efilter import dispatch
 from efilter import protocol
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def say_moo(cow):
     _ = cow
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def graze(cow):
     _ = cow
     raise NotImplementedError()

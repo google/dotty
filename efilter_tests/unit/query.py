@@ -42,7 +42,7 @@ class QueryTest(unittest.TestCase):
         q = query.Query(
             ast.Complement(
                 ast.Equivalence(
-                    ast.Let(
+                    ast.Map(
                         ast.Binding("Process"),
                         ast.Binding("pid")),
                     ast.Literal(10))))

@@ -19,7 +19,7 @@
 """
 EFILTER type system.
 
-This module implements polymorphic function dispatch.
+This module implements multimethod function dispatch.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
@@ -46,8 +46,8 @@ def call_audit(func):
     return audited_func
 
 
-class polymorphic(object):
-    """Polymorphic function that dispatches on the type of the first arg.
+class multimethod(object):
+    """Multimethod that dispatches on the type of the first arg.
 
     This function decorator can be used on instance methods as well as regular
     functions. It allows the function to dispatch on the type of its first
@@ -64,8 +64,15 @@ class polymorphic(object):
     their own conventions about how members of objects are accessed and types
     interact.
 
+    Arguments:
+        func: The original function passed to the decorator. Usually 'func'
+            should just raise NotImplementedError, but if not, it can be used
+            as sort of a default behavior.
+        dispatch_function: Optional. Can override the dispatch type derivation
+            function, which takes the type of the first arg by default.
+
     Examples:
-        @polymorphic
+        @multimethod
         def say_moo(bovine):
             raise NotImplementedError()
 
@@ -99,40 +106,64 @@ class polymorphic(object):
     implementations = None
     func = None
 
-    is_polymorphic_function = True
+    is_multimethod = True
 
-    def __init__(self, func):
+    # Can override behavior of default_dispatch to derive the dispatch type
+    # some other way. For example, using types of more than just the first
+    # argument, or by using the argument itself, in case of functions that
+    # take classes as parameters.
+    dispatch_function = None
+
+    def __init__(self, func, dispatch_function=None):
         self._write_lock = threading.Lock()
         self.func = func
         self._dispatch_table = {}
         self._prefer_table = {}
         self.implementations = []
+        self.dispatch_function = dispatch_function or self.default_dispatch
         functools.update_wrapper(self, func)
+
+    @staticmethod
+    def default_dispatch(args, kwargs):
+        """Returns the type of the first argument as dispatch key."""
+        _ = kwargs
+        if not args:
+            raise ValueError(
+                "Multimethods must be passed at least one positional arg.")
+
+        return type(args[0])
 
     @property
     def func_name(self):
         return self.func.func_name
 
     def __repr__(self):
-        return "polymorphic(%s)" % self.func_name
+        return "multimethod(%s)" % self.func_name
 
-    def __call__(self, obj, *args, **kwargs):
-        implementation = self._find_and_cache_best_function(type(obj))
+    def __call__(self, *args, **kwargs):
+        """Pick the appropriate overload based on args and call it."""
+        dispatch_type = self.dispatch_function(args, kwargs)
+        implementation = self._find_and_cache_best_function(dispatch_type)
         if implementation:
-            return implementation(obj, *args, **kwargs)
+            return implementation(*args, **kwargs)
 
         # Fall-through to calling default implementation. By convention, the
         # default will usually raise a NotImplemented exception, but there
         # may be times when it will actually do something useful (good example
         # are convenience type checking functions, such as issuperposition).
         try:
-            return self.func(obj, *args, **kwargs)
+            return self.func(*args, **kwargs)
         except NotImplementedError:
             # Throw a better exception.
+            if dispatch_type is type(None):
+                raise TypeError(
+                    "%r was passed None for first argument, which was "
+                    "unexpected." % self.func_name)
+
             raise NotImplementedError(
-                "Polymorphic function %r has no concrete implementation for "
+                "Multimethod %r has no concrete implementation for "
                 "type %r and no default implementation. Available handlers: %r"
-                % (self.func_name, type(obj), self.implementations))
+                % (self.func_name, dispatch_type, self.implementations))
 
     def implemented_for_type(self, dispatch_type):
         candidate = self._find_and_cache_best_function(dispatch_type)
@@ -182,12 +213,12 @@ class polymorphic(object):
         Returns:
             Implementing function, in below order of preference:
             1. Explicitly registered implementations (through
-               polymorphic.implement) for types that 'dispatch_type' either is
+               multimethod.implement) for types that 'dispatch_type' either is
                or inherits from directly.
             2. Explicitly registered implementations accepting an abstract type
                (interface) in which dispatch_type participates (through
                abstract_type.register() or the convenience methods).
-            3. Default behavior of the polymorphic function. This will usually
+            3. Default behavior of the multimethod function. This will usually
                raise a NotImplementedError, by convention.
 
         Raises:
@@ -241,7 +272,7 @@ class polymorphic(object):
                         else:
                             raise TypeError(
                                 "Two candidate implementations found for "
-                                "polymorphic function %s (dispatch type %s) "
+                                "multimethod function %s (dispatch type %s) "
                                 "and neither is preferred." %
                                 (self.func.func_name, dispatch_type))
                     else:
@@ -263,7 +294,7 @@ class polymorphic(object):
         """Return a decorator that will register the implementation.
 
         Example:
-            @polymorphic
+            @multimethod
             def add(x, y):
                 pass
 

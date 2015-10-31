@@ -25,18 +25,26 @@ there even is a correct value.
 Real-world examples of when this happens include merge conflicts, roots of
 quadratic equations, and programmers suffering from pathological inability to
 make decisions.
+
+Superpositions are a special case of a repeated var (see protocols.repeated)
+but unlike repeated variables, they don't preserve order of states and only
+contain each state once (a state will appear just once, even if it's added
+more than once, just like with sets). Superpositions also support many more
+operations and are generally faster for certain kinds of things than repeated
+variables.
 """
 
 from efilter import dispatch
 from efilter import protocol
 
 from efilter.protocols import eq
+from efilter.protocols import repeated
 
 # Declarations:
 # pylint: disable=unused-argument
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def superposition(first_state, *states):
     """Build a superposition of states, all of which must be the same type."""
     raise NotImplementedError()
@@ -68,7 +76,7 @@ def meld(*states):
     return getstate(s)
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def getstates(x):
     """Return a collection of the possible states of x."""
     raise NotImplementedError()
@@ -85,31 +93,31 @@ def getstate(x):
         return state
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_type(x):
     """Return the type (class) of the states of x."""
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_union(x, y):
     """Return a new superposition with the union of states."""
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_intersection(x, y):
     """Return a new superposition with the intersection of states."""
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_difference(x, y):
     """Return a new superposition with the difference of states of x and y."""
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def hasstate(sp, state):
     """Does superposition have the (scalar) state?
 
@@ -120,43 +128,46 @@ def hasstate(sp, state):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_eq(x, y):
-    """Are the states of x and y exactly the same?"""
+    """Are the states of x and y exactly the same?
+
+    Order is irrelevant - superpositions compare on contents.
+    """
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_superset(x, y):
     """Are the states of x a superset of the states of y?"""
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_subset(x, y):
     """Optional: are the states of x a subset of the states of y?"""
     return state_superset(y, x)
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_strictsuperset(x, y):
     """Optional: Are the states of x a strict superset of the states of y?"""
     return state_superset(x, y) and not state_eq(x, y)
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_strictsubset(x, y):
     """Optional: Are the states of x a strict subset of the states of y?"""
     return state_strictsuperset(y, x)
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def state_apply(x, f):
     """Apply f to each state of x and return a new superposition of results."""
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def insuperposition(x):
     """Optional: Is x a superposition AND does it have more than one state?"""
     return isinstance(x, ISuperposition) and len(getstates(x)) > 1
@@ -198,5 +209,18 @@ ISuperposition.implement(
         state_eq: _scalar_state_eq,
         state_superset: lambda x, y: state_eq(x, y),
         state_apply: lambda x, f: f(x)
+    }
+)
+
+
+# Implement the IRepeated protocol for superpositions.
+
+repeated.IRepeated.implement(
+    for_type=ISuperposition,
+    implementations={
+        repeated.getvalues: getstates,
+        repeated.value_type: state_type,
+        repeated.value_eq: state_eq,
+        repeated.value_apply: state_apply
     }
 )

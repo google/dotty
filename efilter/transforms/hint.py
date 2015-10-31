@@ -29,7 +29,7 @@ from efilter import query as q
 from efilter.transforms import normalize
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def hint(expr, selector):
     """Retargets the query to apply to a subexpression, to be used for hinting.
 
@@ -86,7 +86,7 @@ def hint(query, selector):
     return q.Query(query, root=new_root)
 
 
-@hint.implementation(for_type=ast.Let)
+@hint.implementation(for_type=ast.Within)
 def hint(expr, selector):
     # Are we already in a branch that we're preserving?
     if not selector:
@@ -95,7 +95,7 @@ def hint(expr, selector):
     # Verify that the AST below is well-formed.
     if not isinstance(expr.lhs, ast.Binding):
         # Can't do anything - might not be correct - perhaps we should
-        # blow up here? (Only Let-forms with a Binding on the LHS can be
+        # blow up here? (Only within-forms with a Binding on the LHS can be
         # hinted.)
         #
         # TODO(adamsh): It's likely that a let with an LHS that's not a binding
@@ -155,12 +155,6 @@ def hint(expr, selector):
         return None
 
     return type(expr)(child)
-
-
-@hint.implementation(for_type=ast.ComponentLiteral)
-def hint(expr, selector):
-    _ = selector
-    return expr
 
 
 @hint.implementation(for_type=ast.IsInstance)

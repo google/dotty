@@ -22,6 +22,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter.protocols import indexable
 from efilter.protocols import hashable
+from efilter.protocols import repeated
 from efilter.protocols import superposition
 
 from efilter.ext import indexset
@@ -88,7 +89,7 @@ class DelegatingSuperposition(object):
         if isinstance(other, type(self)):
             return self._delegate == other._delegate
 
-        return sorted(self._delegate) == sorted(superposition.getstates(other))
+        return sorted(self._delegate) == sorted(repeated.getvalues(other))
 
     def __eq__(self, other):
         if not isinstance(other, superposition.ISuperposition):

@@ -27,33 +27,26 @@ from efilter.protocols import counted
 # pylint: disable=unused-argument
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def select(associative, key):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def resolve(associative, key):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
-def getkeys(associative):
-    raise NotImplementedError()
-
-
 class IAssociative(protocol.Protocol):
-    _protocol_functions = (select, resolve, getkeys)
+    _protocol_functions = (select, resolve)
 
 
 IAssociative.implement(for_type=dict,
                        implementations={
                            select: lambda d, key: d.get(key),
-                           resolve: lambda d, key: d.get(key),
-                           getkeys: lambda d: d.iterkeys()})
+                           resolve: lambda d, key: d.get(key)})
 
 IAssociative.implement(for_type=counted.ICounted,
                        implementations={
                            select: lambda c, idx: c[idx],
-                           resolve: lambda c, idx: c[idx],
-                           getkeys: lambda c: xrange(counted.count(c))})
+                           resolve: lambda c, idx: c[idx]})

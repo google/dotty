@@ -25,12 +25,12 @@ from efilter import protocol
 # pylint: disable=unused-argument
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def eq(x, y):
     raise NotImplementedError()
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def ne(x, y):
     raise NotImplementedError()
 

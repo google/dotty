@@ -38,7 +38,7 @@ Assorted examples:
     # Vars (bindings) and literals are strongly typed:
     5 isa Number  # => True
 
-    # Complicated let-forms (. and where) are supported:
+    # Complicated map-forms (. and where) are supported:
     any Process.parent where (pid > 10)
 """
 
@@ -83,14 +83,6 @@ def NegateValue(*args, **kwargs):
         **kwargs)
 
 
-def FlattenComponentLiteral(*args, **kwargs):
-    if not isinstance(args[0], ast.Binding):
-        raise ValueError(
-            "'has component' must be followed by a component. Got %s." % (
-                args[0]))
-    return ast.ComponentLiteral(args[0].value, **kwargs)
-
-
 def FlattenIsInstance(*args, **kwargs):
     if not isinstance(args[0], ast.Binding):
         raise ValueError(
@@ -98,18 +90,52 @@ def FlattenIsInstance(*args, **kwargs):
     return ast.IsInstance(args[0].value, **kwargs)
 
 
-def TransformLetAny(let, **kwargs):
-    if not isinstance(let, ast.Let):
-        raise ValueError("'any' must be followed by a 'where' expression.")
-    context, expr = let.children
-    return ast.LetAny(context, expr, **kwargs)
+def TransformAny(where, **kwargs):
+    if not isinstance(where, ast.Within):
+        raise ValueError("'any' must be followed by 'where'.")
+    context, expr = where.children
+    return ast.Any(context, expr, **kwargs)
 
 
-def TransformLetEach(let, **kwargs):
-    if not isinstance(let, ast.Let):
-        raise ValueError("'each' must be followed by a 'where' expression.")
-    context, expr = let.children
-    return ast.LetEach(context, expr, **kwargs)
+def TransformEach(where, **kwargs):
+    if not isinstance(where, ast.Within):
+        raise ValueError("'each' must be followed by 'where'.")
+    context, expr = where.children
+    return ast.Each(context, expr, **kwargs)
+
+
+def TransformFilter(where, **kwargs):
+    if not isinstance(where, ast.Within):
+        raise ValueError("'filter' must be followed by 'where'.")
+    context, expr = where.children
+    return ast.Filter(context, expr, **kwargs)
+
+
+def TransformSort(where, **kwargs):
+    if not isinstance(where, ast.Within):
+        raise ValueError("'sort' must be followed by 'where'.")
+    context, expr = where.children
+    return ast.Sort(context, expr, **kwargs)
+
+
+def TransformMap(where, **kwargs):
+    if not isinstance(where, ast.Within):
+        raise ValueError("'map' must be followed by 'where'.")
+    context, expr = where.children
+    return ast.Map(context, expr, **kwargs)
+
+
+class WhereStub(object):
+    """Placeholder for map/sort/etc. expressions only used during parsing."""
+
+    children = None
+    start = None
+    end = None
+
+    def __init__(self, lhs, rhs, start=None, end=None):
+        self.children = (lhs, rhs)
+        self.start = start
+        self.end = end
 
 
 # Operators - infix and prefix.
@@ -120,77 +146,98 @@ Operator = collections.namedtuple("Operator",
 # The order of precedence matters for generated matching rules, which is why
 # this is an OrderedDict.
 INFIX = collections.OrderedDict([
-    ("+", Operator(precedence=3, assoc="left", handler=ast.Sum,
+    ("+", Operator(precedence=4, assoc="left", handler=ast.Sum,
                    docstring="Arithmetic addition.")),
-    ("-", Operator(precedence=3, assoc="left", handler=ast.Difference,
+    ("-", Operator(precedence=4, assoc="left", handler=ast.Difference,
                    docstring="Arithmetic subtraction.")),
-    ("*", Operator(precedence=5, assoc="left", handler=ast.Product,
+    ("*", Operator(precedence=6, assoc="left", handler=ast.Product,
                    docstring="Arithmetic multiplication.")),
-    ("/", Operator(precedence=5, assoc="left", handler=ast.Quotient,
+    ("/", Operator(precedence=6, assoc="left", handler=ast.Quotient,
                    docstring="Arithmetic division.")),
-    ("==", Operator(precedence=2, assoc="left",
+    ("==", Operator(precedence=3, assoc="left",
                     handler=ast.Equivalence,
                     docstring="Equivalence (same as 'is').")),
-    ("!=", Operator(precedence=2, assoc="left",
+    ("!=", Operator(precedence=3, assoc="left",
                     handler=ComplementEquivalence,
                     docstring="Inequivalence (same as 'is not').")),
-    ("not in", Operator(precedence=2, assoc="left",
+    ("not in", Operator(precedence=3, assoc="left",
                         handler=ComplementMembership,
                         docstring="Left-hand operand is not in list.")),
-    ("in", Operator(precedence=2, assoc="left",
+    ("in", Operator(precedence=3, assoc="left",
                     handler=ast.Membership,
                     docstring="Left-hand operand is in list.")),
-    (">=", Operator(precedence=2, assoc="left",
+    ("isa", Operator(precedence=3, assoc="left",
+                     handler=ast.IsInstance,
+                     docstring="Matching object must be instance of type.")),
+    (">=", Operator(precedence=3, assoc="left",
                     handler=ast.PartialOrderedSet,
                     docstring="Equal-or-greater-than.")),
-    ("<=", Operator(precedence=2, assoc="left",
+    ("<=", Operator(precedence=3, assoc="left",
                     handler=ReversePartialOrderedSet,
                     docstring="Equal-or-less-than.")),
-    (">", Operator(precedence=2, assoc="left",
+    (">", Operator(precedence=3, assoc="left",
                    handler=ast.StrictOrderedSet,
                    docstring="Greater-than.")),
-    ("<", Operator(precedence=2, assoc="left",
+    ("<", Operator(precedence=3, assoc="left",
                    handler=ReverseStrictOrderedSet,
                    docstring="Less-than.")),
     ("where", Operator(precedence=2, assoc="left",
-                       handler=ast.Let,
+                       handler=ast.Map,
                        docstring="VALUE where SUBEXPRESSION")),
-    (".", Operator(precedence=6, assoc="left",
-                   handler=ast.Let,
-                   docstring="Shorthand for V where E.")),
+    (".", Operator(precedence=7, assoc="left",
+                   handler=ast.Map,
+                   docstring="LHS.(EXPR) -> evaluate EXPR with LHS as vars.")),
     ("and", Operator(precedence=1, assoc="left",
                      handler=ast.Intersection,
                      docstring="Logical AND.")),
     ("or", Operator(precedence=0, assoc="left", handler=ast.Union,
                     docstring="Logical OR.")),
-    ("=~", Operator(precedence=2, assoc="left",
+    ("=~", Operator(precedence=3, assoc="left",
                     handler=ast.RegexFilter,
                     docstring="Left-hand operand where regex.")),
 ])
 
 
 PREFIX = {
-    "not": Operator(precedence=5, assoc=None, handler=ast.Complement,
+    "not": Operator(precedence=6, assoc=None, handler=ast.Complement,
                     docstring="Logical NOT."),
-    "-": Operator(precedence=4, assoc=None, handler=NegateValue,
+    "-": Operator(precedence=5, assoc=None, handler=NegateValue,
                   docstring="Unary -."),
-    "has component": Operator(precedence=7, assoc=None,
-                              handler=FlattenComponentLiteral,
-                              docstring="Matching entity must have component."),
-    "isa": Operator(precedence=7, assoc=None, handler=FlattenIsInstance,
-                    docstring="Matching object must be instance of type."),
-    "any": Operator(precedence=1, assoc=None, handler=TransformLetAny,
-                    docstring=("Following 'where' should succeed if "
-                               "any left-hand value where.")),
-    "each": Operator(precedence=1, assoc=None, handler=TransformLetEach,
-                     docstring=("Following 'where' should only "
-                                "succeed if all left-hand values match."))
+    "any": Operator(precedence=2, assoc=None, handler=TransformAny,
+                    docstring=(
+                        "any REPEATED.(EXPR) -> return true if EXPR is true "
+                        "for any value of REPEATED.")),
+    "each": Operator(precedence=2, assoc=None, handler=TransformEach,
+                     docstring=(
+                         "each REPEATED.(EXPR) -> return true if EXPR is true "
+                         "for every value of REPEATED.")),
+    "find": Operator(precedence=2, assoc=None, handler=TransformFilter,
+                     docstring=(
+                         "find REPEATED.(EXPR) -> use EXPR to filter "
+                         "REPEATED.")),
+    "sort": Operator(precedence=2, assoc=None, handler=TransformSort,
+                     docstring=(
+                         "sort REPEATED.(EXPR) -> use EXPR to sort "
+                         "REPEATED.")),
+    "map": Operator(precedence=2, assoc=None, handler=TransformMap,
+                    docstring=(
+                        "map REPEATED.(EXPR) -> use EXPR to transform "
+                        "REPEATED."))
 }
 
 
-def EnumAsPattern(strings):
-    """Return a regex that'll match any of the strings in order."""
-    return "(%s)" % "|".join([re.escape(x) for x in strings])
+UNSAFE_PATTERN = re.compile(r".*?\w$")
+
+
+def CompilePattern(pattern):
+    """Compile the operator token into an appropriate regex."""
+    # Patterns that look like they might conflict with symbols or variables
+    # need to have a space immediately after.
+    if UNSAFE_PATTERN.match(pattern):
+        # print "sdgsdggg", pattern
+        return "(%s) " % re.escape(pattern)
+
+    return "(%s)" % re.escape(pattern)
 
 
 class Token(object):
@@ -242,20 +289,27 @@ class Tokenizer(object):
     will try to match the next token in the buffer if its state_regex where
     the current state. Only meaningful tokens are emitted (not whitespace.)
     """
-    patterns = [
+    _infix_patterns = [
+        Pattern("infix", "INITIAL", CompilePattern(pattern), "emit", None)
+        for pattern in INFIX.keys()
+    ]
+
+    _prefix_patterns = [
+        Pattern("prefix", "INITIAL", CompilePattern(pattern), "emit", None)
+        for pattern in PREFIX.keys()
+    ]
+
+    _patterns = [
         # Keywords, operators and symbols
-        Pattern("infix", "INITIAL", EnumAsPattern(INFIX.keys()),
+        Pattern("lparen", "INITIAL", r"(\()",
                 "emit", None),
-        Pattern("prefix", "INITIAL", EnumAsPattern(PREFIX.keys()),
+        Pattern("rparen", "INITIAL", r"(\))",
                 "emit", None),
-        Pattern("lparen", "INITIAL", r"\(",
-                "emit", None),
-        Pattern("rparen", "INITIAL", r"\)",
-                "emit", None),
-        Pattern("comma", "INITIAL", r",",
+        Pattern("comma", "INITIAL", r"(,)",
                 "emit", None),
         Pattern("symbol", "INITIAL", r"([a-z_][a-z_0-9]+)", "emit", None),
         Pattern("param", "INITIAL", r"\{([a-z_0-9]*)\}", "emit_param", None),
+        Pattern("param", "INITIAL", r"(\?)", "emit_param", None),
 
         # Numeric literals
         Pattern("literal", "INITIAL", r"(\d+\.\d+)", "emit_float", None),
@@ -263,20 +317,22 @@ class Tokenizer(object):
         Pattern("literal", "INITIAL", r"(\d+)", "emit_int", None),
 
         # String literals
-        Pattern(None, "INITIAL", r"\"", "string_start", "STRING"),
-        Pattern(None, "INITIAL", r"'", "string_start", "SQ_STRING"),
+        Pattern(None, "INITIAL", r"(\")", "string_start", "STRING"),
+        Pattern(None, "INITIAL", r"(')", "string_start", "SQ_STRING"),
 
-        Pattern("literal", "STRING", "\"", "pop_state,emit_string", None),
+        Pattern("literal", "STRING", "(\")", "pop_state,emit_string", None),
         Pattern(None, "STRING", r"\\(.)", "string_escape", None),
-        Pattern(None, "STRING", r"[^\\\"]+", "string_append", None),
+        Pattern(None, "STRING", r"([^\\\"]+)", "string_append", None),
 
-        Pattern("literal", "SQ_STRING", "'", "pop_state,emit_string", None),
+        Pattern("literal", "SQ_STRING", "(')", "pop_state,emit_string", None),
         Pattern(None, "SQ_STRING", r"\\(.)", "string_escape", None),
-        Pattern(None, "SQ_STRING", r"[^\\']+", "string_append", None),
+        Pattern(None, "SQ_STRING", r"([^\\']+)", "string_append", None),
 
         # Whitespace is ignored.
-        Pattern(None, ".", r"\s+", None, None),
+        Pattern(None, ".", r"(\s+)", None, None),
     ]
+
+    patterns = _infix_patterns + _prefix_patterns + _patterns
 
     def __init__(self, query):
         self.buffer = query
@@ -366,7 +422,7 @@ class Tokenizer(object):
                     raise RuntimeError(
                         "No method defined for pattern action %s!" % action)
 
-                token = callback(string=m.group(0), match=m, pattern=pattern)
+                token = callback(string=m.group(1), match=m, pattern=pattern)
 
             self._position = position
 
@@ -387,7 +443,8 @@ class Tokenizer(object):
 
     def emit_param(self, match, pattern, **_):
         param_name = match.group(1)
-        if not param_name:
+
+        if not param_name or param_name == "?":
             param_name = self._param_idx
             self._param_idx += 1
 

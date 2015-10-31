@@ -42,13 +42,13 @@ class AnalyseTest(unittest.TestCase):
         self.assertIn("ProcessName", analysis.symbols)
         self.assertIn("ProcessName", analysis.eq_indexables)
 
-    def testLet(self):
+    def testWithin(self):
         analysis = analyse.analyse(q.Query("Process.name == 'foo'"))
         self.assertIn("Process", analysis.symbols)
         self.assertIn("Process.name", analysis.symbols)
         self.assertIn("Process.name", analysis.eq_indexables)
 
-    def testNestedLet(self):
+    def testMap(self):
         analysis = analyse.analyse(
             q.Query("Process.parent where (Process.name == 'init')"))
         self.assertIn("Process.parent", analysis.symbols)
@@ -69,13 +69,9 @@ class AnalyseTest(unittest.TestCase):
         self.assertSetEqual(set(analysis.symbols), set())
         self.assertSetEqual(set(analysis.eq_indexables), set())
 
-    def testComponentLiteral(self):
-        analysis = analyse.analyse(q.Query("has component Process"))
-        self.assertSetEqual(set(analysis.symbols), {"Process"})
-
     def testIsInstance(self):
-        analysis = analyse.analyse(q.Query("isa Process"))
-        self.assertSetEqual(set(analysis.symbols), {"Process"})
+        analysis = analyse.analyse(q.Query("proc isa Process"))
+        self.assertSetEqual(set(analysis.symbols), {"Process", "proc"})
 
     def testBinaryExpression(self):
         analysis = analyse.analyse(q.Query("Legion.name in Legion.many"))

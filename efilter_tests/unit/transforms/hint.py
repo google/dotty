@@ -37,7 +37,7 @@ class HintTest(testlib.EfilterTestCase):
             hint.hint(original, None),
             original)
 
-    def testLet(self):
+    def testMap(self):
         self.assertEqual(
             hint.hint(query.Query("Process.name == 'init'"), "Process"),
             query.Query("name == 'init'"))
@@ -47,6 +47,12 @@ class HintTest(testlib.EfilterTestCase):
             hint.hint(query.Query("Process.parent.Process.name == 'init'"),
                       "Process.parent"),
             query.Query("Process.name == 'init'"))
+
+    def testWithin(self):
+        self.assertEqual(
+            hint.hint(query.Query("Process.(sort children.pid)"),
+                      "Process"),
+            query.Query("sort children.pid"))
 
     def testNested(self):
         self.assertEqual(
@@ -71,8 +77,7 @@ class HintTest(testlib.EfilterTestCase):
 
     def testSubquery(self):
         self.assertEqual(
-            hint.hint(query.Query("VAD.process where "
-                                  "(Process.command == 'Adium') "
+            hint.hint(query.Query("VAD.process.Process.command == 'Adium'"
                                   "and 'execute' in VAD.permissions "
                                   "and 'write' in VAD.permissions"),
                       "VAD.process"),
@@ -82,20 +87,6 @@ class HintTest(testlib.EfilterTestCase):
         self.assertEqual(
             hint.hint(query.Query("Process.name + 10 + 10"), "Process"),
             query.Query("name + 10 + 10"))
-
-    def testComponentLiteral(self):
-        # TODO: 'has component' and 'isa' are currently weird, in that they are
-        # unary expressions that apply to bindings, instead of a var in
-        # bindings. Both are this way for historical reasons, and will chance
-        # soon to be regular binary expressions applying to a var. Once that's
-        # been done, the assertion below can be enabled.
-
-        # self.assertEqual(
-        #     hint.hint(
-        #         query.Query("Process.parent has component Struct"),
-        #         "Process.parent"),
-        #     "has component Struct")
-        pass
 
     def testIsInstance(self):
         # TODO: 'has component' and 'isa' are currently weird, in that they are

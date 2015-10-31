@@ -79,7 +79,7 @@ Aquatic.register(SeaCow)
 
 # Test functions
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def speak(animal):
     _ = animal
     raise NotImplementedError()

@@ -28,7 +28,7 @@ from efilter import protocol
 class EfilterTestCase(unittest.TestCase):
     def assertImplemented(self, for_type, function):
         self.assertTrue(function.implemented_for_type(for_type),
-                        "Polymorphic function %r is not implemented for %r." %
+                        "Multimethod %r is not implemented for %r." %
                         (function, for_type))
 
     def assertIsa(self, t, p):

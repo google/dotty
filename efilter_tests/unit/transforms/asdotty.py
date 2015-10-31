@@ -41,21 +41,21 @@ class AsDottyTest(unittest.TestCase):
         self.assertOutput(original="5 + 5 + 10 == 20",
                           output="5 + 5 + 10 == 20")
 
-    def testLet(self):
+    def testMap(self):
         self.assertOutput(original="Process.name == 'foo'",
                           output="Process.name == 'foo'")
 
-    def testWhere(self):
+    def testWithin(self):
         self.assertOutput(
             original="Process.parent where (name == 'foo' and pid == 5)",
             output="Process.parent where (name == 'foo' and pid == 5)")
 
-    def testLetAny(self):
+    def testAny(self):
         self.assertOutput(
             original="any Process.parent where (name == 'foo')",
             output="any Process.parent where (name == 'foo')")
 
-    def testLetEach(self):
+    def testEach(self):
         self.assertOutput(
             original="each Process.parent where (name == 'foo')",
             output="each Process.parent where (name == 'foo')")
@@ -99,12 +99,7 @@ class AsDottyTest(unittest.TestCase):
             original="5 in (10, 5)",
             output="5 in (10, 5)")
 
-    def testComponentLiteral(self):
-        self.assertOutput(
-            original="has component User",
-            output="has component User")
-
     def testIsInstance(self):
         self.assertOutput(
-            original="isa User",
-            output="isa User")
+            original="adam isa User",
+            output="adam isa User")

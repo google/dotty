@@ -136,14 +136,6 @@ class Binding(ValueExpression):
     type_signature = (associative.IAssociative,)
 
 
-class IsInstance(ValueExpression):
-    """Evaluates to True if the current scope is an instance of type."""
-
-
-class ComponentLiteral(ValueExpression):
-    """Evaluates to True if the component exists."""
-
-
 class Complement(ValueExpression):
     """Logical NOT."""
 
@@ -154,16 +146,21 @@ class Complement(ValueExpression):
 ### Binary expressions ###
 
 
-class Let(BinaryExpression):
-    """Let(BINDING, SUBQUERY) evaluates SUBQUERY with the result of BINDING.
+class IsInstance(BinaryExpression):
+    """Evaluates to True if the current scope is an instance of type."""
 
-    Example:
-    # True if the parent of this process has a Timestamps component.
-    Let("Process/parent", ComponentLiteral("Timestamps"))
+
+class Within(BinaryExpression):
+    """Uses left side as new bindings and evaluates right side as a subquery.
+
+    Concrete behavior depends on the various subclasses, such as Filter and
+    Map, but each one of them will expect left hand side to be an associative
+    object holding the new bindings, or a repeated variable of associative
+    objects.
     """
-
-    type_signature = (associative.IAssociative, Expression)
-    return_signature = None  # Depends on rhs.
+    __abstract = True
+    type_signature = (associative.IAssociative, protocol.AnyType)
+    return_signature = None  # Depends on RHS.
 
     @property
     def context(self):
@@ -174,16 +171,33 @@ class Let(BinaryExpression):
         return self.rhs
 
 
-class LetAny(Let):
-    """Like Let, but handles multiple BINDINGS using intersection semantics."""
+class Map(Within):
+    """Returns the result of applying right side to the values on left side.
 
-    return_signature = boolean.IBoolean
+    If left is a repeated value then this will return another repeated value.
+    """
 
 
-class LetEach(Let):
-    """Like Let, but handles multiple BINDINGS using union semantics."""
+class Filter(Within):
+    """Filters (repeated) values on left side using expression on right side.
 
-    return_signature = boolean.IBoolean
+    Will return a repeated variable containing only the values for which the
+    expression on the right evaluated to true.
+    """
+
+
+class Sort(Within):
+    """Sorts the left hand side using the right hand side return."""
+
+
+class Any(Within):
+    """Returns true if the rhs evaluates as true for any value of lhs."""
+    return_signature = bool
+
+
+class Each(Within):
+    """Returns true if the rhs evaluates as true for every value of lhs."""
+    return_signature = bool
 
 
 class Membership(BinaryExpression):

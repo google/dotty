@@ -28,7 +28,7 @@ from efilter import protocol
 # pylint: disable=unused-argument
 
 
-@dispatch.polymorphic
+@dispatch.multimethod
 def hashed(x):
     raise NotImplementedError()
 
