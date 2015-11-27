@@ -20,7 +20,6 @@ EFILTER coverage tests for units
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-from efilter.transforms import analyse
 from efilter.transforms import asdotty
 from efilter.transforms import hint
 from efilter.transforms import infer_type
@@ -28,7 +27,6 @@ from efilter.transforms import normalize
 from efilter.transforms import solve
 from efilter.transforms import validate
 
-from efilter_tests.unit.transforms import analyse as analyse_test
 from efilter_tests.unit.transforms import asdotty as asdotty_test
 from efilter_tests.unit.transforms import hint as hint_test
 from efilter_tests.unit.transforms import infer_type as infer_type_test
@@ -42,6 +40,9 @@ from efilter_tests import testlib
 class UnitCoverageTest(testlib.EfilterTestCase):
     def assertUnitCoverage(self, function, test_cls):
         """Assert that 'test_cls' has a test method for each implementation."""
+        if not testlib.TEST_COVERAGE:
+            return
+
         for t, _ in function.implementations:
             test_name = "test%s" % t.__name__
             test = getattr(test_cls, test_name, None)
@@ -50,9 +51,6 @@ class UnitCoverageTest(testlib.EfilterTestCase):
                 callable(test),
                 "%r is missing a test for %r over type %r." %
                 (test_cls.__name__, function.func_name, t.__name__))
-
-    def testAnalyseCoverage(self):
-        self.assertUnitCoverage(analyse.analyse, analyse_test.AnalyseTest)
 
     def testAsDottyCoverage(self):
         self.assertUnitCoverage(asdotty.asdotty, asdotty_test.AsDottyTest)

@@ -33,6 +33,7 @@ from efilter.protocols import eq
 from efilter.protocols import iset
 from efilter.protocols import ordered
 from efilter.protocols import number
+from efilter.protocols import repeated
 
 
 class Expression(object):
@@ -130,20 +131,65 @@ class Literal(ValueExpression):
     type_signature = None  # Depends on literal.
 
 
-class Binding(ValueExpression):
+class Var(ValueExpression):
     """Represents a member of the evaluated object - attributes of entity."""
 
     type_signature = (associative.IAssociative,)
 
 
-class Complement(ValueExpression):
+class UnaryOperation(ValueExpression):
+    """Represents an operation on a single operand (subexpression)."""
+    __abstract = True
+
+
+class Complement(UnaryOperation):
     """Logical NOT."""
 
     type_signature = (boolean.IBoolean,)
     return_signature = boolean.IBoolean
 
 
+class Reverse(UnaryOperation):
+    """Reverse order of repeated values."""
+
+    type_signature = (repeated.IRepeated)
+    return_signature = repeated.IRepeated
+
+
 ### Binary expressions ###
+
+class Pair(BinaryExpression):
+    """Represents a key/value pair."""
+
+    type_signature = (protocol.AnyType, protocol.AnyType)
+    return_signature = tuple
+
+    @property
+    def key(self):
+        return self.lhs
+
+    @property
+    def value(self):
+        return self.rhs
+
+
+class Select(BinaryExpression):
+    """Represents a selection of the key (rhs) from the value (lhs).
+
+    This is similar to using map(value, var(...)) but allows the key to
+    be generated at runtime.
+    """
+
+    type_signature = (associative.IAssociative, protocol.AnyType)
+    return_signature = None
+
+    @property
+    def value(self):
+        return self.lhs
+
+    @property
+    def key(self):
+        return self.rhs
 
 
 class IsInstance(BinaryExpression):
@@ -151,11 +197,11 @@ class IsInstance(BinaryExpression):
 
 
 class Within(BinaryExpression):
-    """Uses left side as new bindings and evaluates right side as a subquery.
+    """Uses left side as new vars and evaluates right side as a subquery.
 
     Concrete behavior depends on the various subclasses, such as Filter and
     Map, but each one of them will expect left hand side to be an associative
-    object holding the new bindings, or a repeated variable of associative
+    object holding the new vars, or a repeated variable of associative
     objects.
     """
     __abstract = True
@@ -228,6 +274,32 @@ class RegexFilter(BinaryExpression):
 
 
 ### Variadic Expressions ###
+
+class Apply(VariadicExpression):
+    """Represents application of arguments to a function."""
+    type_signature = protocol.AnyType
+    return_signature = protocol.AnyType
+
+    @property
+    def func(self):
+        return self.children[0]
+
+    @property
+    def args(self):
+        return self.children[1:]
+
+
+class Bind(VariadicExpression):
+    """Creates a new IAssociative of vars."""
+    type_signature = protocol.AnyType
+    return_signature = associative.IAssociative
+
+
+class Repeat(VariadicExpression):
+    """Creates a new IRepeated of values."""
+    type_signature = protocol.AnyType
+    return_signature = repeated.IRepeated
+
 
 ### Logical Variadic ###
 

@@ -35,7 +35,7 @@ Assorted examples:
     # Most arithmetic expression behave as they would in Python or C:
     (10 + 5 * (20 - 10)) in (10, 20, 30) and not 5 > 10
 
-    # Vars (bindings) and literals are strongly typed:
+    # Vars (vars) and literals are strongly typed:
     5 isa Number  # => True
 
     # Complicated map-forms (. and where) are supported:
@@ -84,7 +84,7 @@ def NegateValue(*args, **kwargs):
 
 
 def FlattenIsInstance(*args, **kwargs):
-    if not isinstance(args[0], ast.Binding):
+    if not isinstance(args[0], ast.Var):
         raise ValueError(
             "'isa' must be followed by a type. Got %s." % args[0])
     return ast.IsInstance(args[0].value, **kwargs)
@@ -548,8 +548,8 @@ class Parser(syntax.Syntax):
                                start=token.start, end=token.end)
 
         if token.name == "symbol":
-            return ast.Binding(token.value, start=token.start,
-                               end=token.end)
+            return ast.Var(token.value, start=token.start,
+                           end=token.end)
 
         if token.name == "lparen":
             # Parentheses can denote subexpressions or lists. Lists have at

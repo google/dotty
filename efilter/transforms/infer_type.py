@@ -26,6 +26,7 @@ from efilter import ast
 from efilter import protocol
 from efilter import query as q
 
+from efilter.protocols import applicative
 from efilter.protocols import boolean
 from efilter.protocols import reflective
 
@@ -68,9 +69,9 @@ def infer_type(expr, scope):
     return type(expr.value)
 
 
-@infer_type.implementation(for_type=ast.Binding)
+@infer_type.implementation(for_type=ast.Var)
 def infer_type(expr, scope):
-    if scope:
+    if scope and protocol.isa(scope, reflective.IReflective):
         result = reflective.reflect(scope, expr.value)
 
         if result:
@@ -90,6 +91,11 @@ def infer_type(expr, scope):
     return bool
 
 
+@infer_type.implementation(for_type=ast.Reverse)
+def infer_type(expr, scope):
+    return infer_type(expr.value, scope)
+
+
 @infer_type.implementation(for_type=ast.IsInstance)
 def infer_type(expr, scope):
     _ = expr, scope
@@ -102,10 +108,46 @@ def infer_type(expr, scope):
     return expr.return_signature
 
 
+@infer_type.implementation(for_type=ast.Select)
+def infer_type(expr, scope):
+    """Try to infer the type of x[y] if y is a known value (literal)."""
+    # Do we know what the key even is?
+    if isinstance(expr.key, ast.Literal):
+        key = expr.key.value
+    else:
+        return protocol.AnyType
+
+    container_type = infer_type(expr.value, scope)
+
+    if protocol.isa(container_type, reflective.IReflective):
+        t = reflective.reflect(container_type, key)
+        if t:
+            return t
+
+    return protocol.AnyType
+
+
 @infer_type.implementation(for_type=ast.VariadicExpression)
 def infer_type(expr, scope):
     _ = scope
     return expr.return_signature
+
+
+@infer_type.implementation(for_type=ast.Apply)
+def infer_type(expr, scope):
+    func_type = infer_type(expr.func, scope)
+    if protocol.isa(func_type, applicative.IApplicative):
+        t = applicative.reflect_return(func_type)
+        if t:
+            return t
+
+    return protocol.AnyType
+
+
+@infer_type.implementation(for_type=ast.Repeat)
+def infer_type(expr, scope):
+    """Check the type of the repeated value (all members have the same type.)"""
+    return infer_type(expr.children[0], scope)
 
 
 @infer_type.implementation(for_type=ast.Map)

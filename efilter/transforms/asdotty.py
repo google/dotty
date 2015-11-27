@@ -25,7 +25,7 @@ from efilter import ast
 from efilter import syntax
 from efilter import query as q
 
-from efilter.parsers.experiments import dotty
+from efilter.parsers import dotty
 
 
 def __build_operator_lookup(*tables):
@@ -55,6 +55,12 @@ def asdotty(expr):
 
 
 syntax.Syntax.register_formatter(shorthand="dotty", formatter=asdotty)
+
+
+@asdotty.implementation(for_type=ast.Expression)
+def asdotty(query):
+    _ = query
+    return "<subexpression cannot be formatted as dotty>"
 
 
 @asdotty.implementation(for_type=q.Query)
@@ -98,7 +104,7 @@ def asdotty(expr):
     return repr(expr.value)
 
 
-@asdotty.implementation(for_type=ast.Binding)
+@asdotty.implementation(for_type=ast.Var)
 def asdotty(expr):
     return expr.value
 
@@ -111,7 +117,7 @@ def asdotty(expr):
         return "%s != %s" % (asdotty(child.children[0]),
                              asdotty(child.children[1]))
 
-    if isinstance(child, (ast.Within, ast.Binding,
+    if isinstance(child, (ast.Within, ast.Var,
                           ast.Literal)):
         return "not %s" % asdotty(child)
 

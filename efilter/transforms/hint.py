@@ -93,17 +93,17 @@ def hint(expr, selector):
         return expr
 
     # Verify that the AST below is well-formed.
-    if not isinstance(expr.lhs, ast.Binding):
+    if not isinstance(expr.lhs, ast.Var):
         # Can't do anything - might not be correct - perhaps we should
-        # blow up here? (Only within-forms with a Binding on the LHS can be
+        # blow up here? (Only within-forms with a Var on the LHS can be
         # hinted.)
         #
-        # TODO(adamsh): It's likely that a let with an LHS that's not a binding
+        # TODO(adamsh): It's likely that a let with an LHS that's not a var
         # has very limited uses anyway - maybe consider not allowing it in the
         # AST.
         raise errors.EfilterError(
             message=("Hinter can only optimize let forms where lhs is a "
-                     "binding (a variable). Got %r instead.") % expr,
+                     "var (a variable). Got %r instead.") % expr,
             root=expr)
 
     if selector[0] == expr.lhs.value:
@@ -182,7 +182,7 @@ def hint(expr, selector):
     return expr
 
 
-@hint.implementation(for_type=ast.Binding)
+@hint.implementation(for_type=ast.Var)
 def hint(expr, selector):
     if not selector:
         return expr

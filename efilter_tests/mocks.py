@@ -22,8 +22,22 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import collections
 
+from efilter.protocols import applicative
 from efilter.protocols import associative
 from efilter.protocols import reflective
+
+
+class MockFunction(object):
+    def apply(self, x, y):
+        return x + y
+
+    @classmethod
+    def reflect_return(cls):
+        return int
+
+    @classmethod
+    def reflect_args(cls):
+        (int, int)
 
 
 class Process(collections.namedtuple("Process", ["pid", "name", "parent"])):
@@ -69,6 +83,7 @@ associative.IAssociative.implement(
 
 reflective.IReflective.implicit_dynamic(Process)
 reflective.IReflective.implicit_dynamic(_proc)
+applicative.IApplicative.implicit_dynamic(MockFunction)
 
 
 class MockRootType(object):
@@ -84,12 +99,16 @@ class MockRootType(object):
             "p_pid": int,
             "p_comm": unicode,
             "p_ppid": int,
+        },
+        "MockFunction": {
+            "_": MockFunction,
         }
     }
 
     GLOBALS = {
         "_root_proc": _proc(1, "init", 0),
         "_current_proc": _proc(2, "foo", 1),
+        "mock_func": MockFunction(),
     }
 
     @classmethod
@@ -100,11 +119,14 @@ class MockRootType(object):
         if name == "_proc":
             return _proc
 
+        if name == "mock_func":
+            return MockFunction
+
         return None
 
     @classmethod
     def getkeys(cls):
-        return ("Process", "_proc")
+        return ("Process", "_proc", "mock_func")
 
 
 reflective.IReflective.implicit_dynamic(MockRootType)

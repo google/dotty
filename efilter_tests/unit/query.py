@@ -34,8 +34,8 @@ class QueryTest(unittest.TestCase):
         q = query.Query("foo == bar")
         self.assertEquals(
             q.root,
-            ast.Equivalence(ast.Binding("foo"),
-                            ast.Binding("bar")))
+            ast.Equivalence(ast.Var("foo"),
+                            ast.Var("bar")))
 
     def testFormatters(self):
         """Creating a query with raw AST should generate the source."""
@@ -43,8 +43,8 @@ class QueryTest(unittest.TestCase):
             ast.Complement(
                 ast.Equivalence(
                     ast.Map(
-                        ast.Binding("Process"),
-                        ast.Binding("pid")),
+                        ast.Var("Process"),
+                        ast.Var("pid")),
                     ast.Literal(10))))
         self.assertEquals(q.source, "Process.pid != 10")
 

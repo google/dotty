@@ -21,6 +21,7 @@ EFILTER test suite.
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import ast
+from efilter import errors
 from efilter import query as q
 
 from efilter.protocols import repeated
@@ -42,16 +43,87 @@ class SolveTest(testlib.EfilterTestCase):
             solve.solve(q.Query("42"), {}).value,
             42)
 
-    def testBinding(self):
+    def testVar(self):
         self.assertEqual(
             solve.solve(q.Query("foo"), {"foo": "bar"}).value,
             "bar")
+
+    def testApply(self):
+        self.assertEqual(
+            solve.solve(q.Query("f(x)", syntax="dottysql"),
+                        dict(f=lambda x: x * 2, x=5)).value,
+            10)
+
+        self.assertEqual(
+            solve.solve(
+                q.Query("multiply(x: 5, y: 5)", syntax="dottysql"),
+                dict(multiply=lambda x, y: x * y)).value,
+            25)
+
+        with self.assertRaises(errors.EfilterError):
+            solve.solve(
+                q.Query("multiply(x: 5, 'y': 5)", syntax="dottysql"),
+                dict(multiply=lambda x, y: x * y))
+
+    def testBind(self):
+        query = ast.Bind(
+            ast.Pair(ast.Literal("x"), ast.Literal(5)),
+            ast.Pair(ast.Literal("y"), ast.Literal(10)))
+
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            {"x": 5, "y": 10})
+
+    def testRepeat(self):
+        query = q.Query("(1, 2, 3, 4)", syntax="dottysql")
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            repeated.meld(1, 2, 3, 4))
+
+        # Repeated values flatten automatically.
+        query = q.Query("(1, (2, 3), 4)", syntax="dottysql")
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            repeated.meld(1, 2, 3, 4))
+
+        # Expressions work.
+        query = q.Query("(1, (2 + 2), 3, 4)", syntax="dottysql")
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            repeated.meld(1, 4, 3, 4))
+
+        # Repeated values are mono-types.
+        with self.assertRaises(errors.EfilterTypeError):
+            query = q.Query("(1, 'foo', 3, 4)", syntax="dottysql")
+            solve.solve(query, {})
+
+    def testPair(self):
+        query = q.Query("x: y", syntax="dottysql")
+        self.assertEqual(
+            solve.solve(query, dict(x="foo", y="bar")).value,
+            ("foo", "bar"))
+
+    def testReverse(self):
+        query = ast.Reverse(
+            ast.Repeat(
+                ast.Literal(1),
+                ast.Literal(2),
+                ast.Literal(3)))
+        self.assertEquals(
+            solve.solve(query, {}).value,
+            repeated.meld(3, 2, 1))
 
     def testMap(self):
         self.assertEqual(
             solve.solve(
                 q.Query("foo.bar"), {"foo": {"bar": "baz"}}).value,
             "baz")
+
+    def testSelect(self):
+        self.assertEqual(
+            solve.solve(q.Query("x['y']", syntax="dottysql"),
+                        {"x": {"y": 5}}).value,
+            5)
 
     def testEach(self):
         self.assertEqual(

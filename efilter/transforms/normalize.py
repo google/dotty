@@ -35,27 +35,15 @@ def normalize(expr):
     works by recognizing certain patterns and replacing them with nicer ones,
     eliminating pointless expressions, and so on.
 
-    Examples:
-        # Logical expressions are made variadic:
-        Intersection("foo", Intersection("bar", "baz")) # becomes:
-        Intersection("foo", "bar", "baz")
+    # Collapsing nested variadic expressions:
 
-        # Map-forms are rotated so that the LHS is a Binding when possible:
-        Map(
-            Map(
-                Binding("Process"),
-                Binding("parent")),
-            Equivalence(
-                Binding("name"),
-                Literal("init")))
-        # Becomes:
-        Map(
-            Binding("Process"),
-            Map(
-                Binding("parent"),
-                Equivalence(
-                    Binding("name"),
-                    Literal("init"))))
+    Example:
+        Intersection(x, Interestion(y, z)) => Intersection(x, y, z)
+
+    # Empty branch elimination:
+
+    Example:
+        Intersection(x) => x
     """
     _ = expr
     raise NotImplementedError()
@@ -72,55 +60,25 @@ def normalize(expr):
     return expr
 
 
-@normalize.implementation(for_type=ast.Map)
+@normalize.implementation(for_type=ast.Reverse)
 def normalize(expr):
-    """Rotate nested map-forms so they cascade on the RHS.
-
-    Basic map-forms should be rotated as follows:
-    (map (map x y) (...)) => (map x (map y) (...))
-
-    These are functionally equivalent, but the latter is easier to follow.
-
-    Returns rotated Map instance.
-    """
-    lhs = normalize(expr.lhs)
-    rhs = normalize(expr.rhs)
-
-    if (isinstance(lhs, ast.Map)
-            and isinstance(lhs.lhs, ast.Binding)):
-        lhs_ = lhs.lhs
-        rhs = type(expr)(lhs.rhs, rhs, start=lhs.rhs.start, end=rhs.end)
-        lhs = lhs_
-
-    return type(expr)(lhs, rhs, start=lhs.start, end=rhs.end)
-
-
-@normalize.implementation(for_type=ast.Within)
-def normalize(expr):
-    """any, each, filter and sort are not cascaded.
-
-    This is basically a pass-through function.
-    """
-    lhs = normalize(expr.lhs)
-    rhs = normalize(expr.rhs)
-    return type(expr)(lhs, rhs, start=lhs.start, end=rhs.end)
+    return type(expr)(normalize(expr.value), start=expr.start, end=expr.end)
 
 
 @normalize.implementation(for_type=ast.BinaryExpression)
 def normalize(expr):
-    """Eliminate if either of the children is None."""
+    """Normalize both sides, but don't eliminate the expression."""
     lhs = normalize(expr.lhs)
     rhs = normalize(expr.rhs)
-
-    if lhs is None:
-        if rhs is None:
-            return None
-
-        return rhs
-    elif rhs is None:
-        return lhs
-
     return type(expr)(lhs, rhs, start=lhs.start, end=rhs.end)
+
+
+@normalize.implementation(for_type=ast.Apply)
+def normalize(expr):
+    """No elimination, but normalize arguments."""
+    args = [normalize(arg) for arg in expr.args]
+
+    return type(expr)(expr.func, *args, start=expr.start, end=expr.end)
 
 
 @normalize.implementation(for_type=ast.VariadicExpression)

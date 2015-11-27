@@ -22,19 +22,16 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import unittest
 
-from efilter import ast
-from efilter.parsers import lisp
+from efilter.protocols import applicative
 
 
-class ParserTest(unittest.TestCase):
-    def assertQueryMatches(self, query, expected):
-        parser = lisp.Parser(query)
-        actual = parser.root
-        self.assertEqual(expected, actual)
+# pylint: disable=blacklisted-name
 
-    def testBasic(self):
-        self.assertQueryMatches(
-            ("==", ("var", "foo"), "bar"),
-            ast.Equivalence(
-                ast.Var("foo"),
-                ast.Literal("bar")))
+
+class ApplicativeTest(unittest.TestCase):
+    def testApplyingFunction(self):
+        def _do_stuff(foo, bar):
+            return "%s, %s" % (foo, bar)
+
+        result = applicative.apply(_do_stuff, ["x"], dict(bar="y"))
+        self.assertEqual(result, "x, y")

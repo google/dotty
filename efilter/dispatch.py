@@ -46,6 +46,29 @@ def call_audit(func):
     return audited_func
 
 
+def _class_dispatch(args, kwargs):
+    """See 'class_multimethod'."""
+    _ = kwargs
+    if not args:
+        raise ValueError(
+            "Multimethods must be passed at least one positional arg.")
+
+    if not isinstance(args[0], type):
+        raise TypeError(
+            "class_multimethod must be called with a type, not instance.")
+
+    return args[0]
+
+
+def class_multimethod(func):
+    """Declare a multimethod that dispatches on the first arg.
+
+    If you think of 'multimethod' as working on the instances of classes then
+    this would work on the classes.
+    """
+    return multimethod(func, dispatch_function=_class_dispatch)
+
+
 class multimethod(object):
     """Multimethod that dispatches on the type of the first arg.
 

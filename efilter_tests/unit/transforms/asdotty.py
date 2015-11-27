@@ -32,6 +32,10 @@ class AsDottyTest(unittest.TestCase):
         """Get coverage test to shut up."""
         pass
 
+    def testExpression(self):
+        """Get coverage test to shut up."""
+        pass
+
     def assertOutput(self, original, output):
         q = query.Query(original, syntax="dotty")
         actual_output = asdotty.asdotty(q)
@@ -65,7 +69,7 @@ class AsDottyTest(unittest.TestCase):
             original="'foo'",
             output="'foo'")
 
-    def testBinding(self):
+    def testVar(self):
         self.assertOutput(
             original="foo",
             output="foo")

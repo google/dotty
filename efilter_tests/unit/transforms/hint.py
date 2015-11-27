@@ -90,8 +90,8 @@ class HintTest(testlib.EfilterTestCase):
 
     def testIsInstance(self):
         # TODO: 'has component' and 'isa' are currently weird, in that they are
-        # unary expressions that apply to bindings, instead of a var in
-        # bindings. Both are this way for historical reasons, and will chance
+        # unary expressions that apply to vars, instead of a var in
+        # vars. Both are this way for historical reasons, and will chance
         # soon to be regular binary expressions applying to a var. Once that's
         # been done, the assertion below can be enabled.
 
@@ -119,7 +119,7 @@ class HintTest(testlib.EfilterTestCase):
             hint.hint(query.Query("10"), "foo"),
             query.Query("10"))
 
-    def testBinding(self):
+    def testVar(self):
         self.assertEqual(
             hint.hint(query.Query("foo.bar"), "foo"),
             query.Query("bar"))

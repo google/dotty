@@ -22,7 +22,6 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import ast
 
-from efilter.transforms import analyse
 from efilter.transforms import asdotty
 from efilter.transforms import hint
 from efilter.transforms import infer_type
@@ -35,6 +34,9 @@ from efilter_tests import testlib
 
 class TransformCoverageTest(testlib.EfilterTestCase):
     def assertASTCoverage(self, function):
+        if not testlib.TEST_COVERAGE:
+            return
+
         for name in dir(ast):
             cls = getattr(ast, name)
             if (isinstance(cls, type) and
@@ -42,9 +44,6 @@ class TransformCoverageTest(testlib.EfilterTestCase):
                     not getattr(cls, "_%s__abstract" % cls.__name__, None)):
 
                 self.assertImplemented(function=function, for_type=cls)
-
-    def testAnalyseCoverage(self):
-        self.assertASTCoverage(analyse.analyse)
 
     def testAsDottyCoverage(self):
         self.assertASTCoverage(asdotty.asdotty)

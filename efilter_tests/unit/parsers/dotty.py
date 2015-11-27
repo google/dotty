@@ -24,7 +24,7 @@ import unittest
 
 from efilter import ast
 
-from efilter.parsers.experiments import dotty
+from efilter.parsers import dotty
 
 
 class TokenizerTest(unittest.TestCase):
@@ -121,24 +121,24 @@ class ParserTest(unittest.TestCase):
     def testDescendQuery(self):
         query = "Process.(name == 'init' and pid == 1)"
         expected = ast.Map(
-            ast.Binding("Process"),
+            ast.Var("Process"),
             ast.Intersection(
                 ast.Equivalence(
-                    ast.Binding("name"),
+                    ast.Var("name"),
                     ast.Literal("init")
                 ),
                 ast.Equivalence(
-                    ast.Binding("pid"),
+                    ast.Var("pid"),
                     ast.Literal(1))))
         self.assertQueryMatches(query, expected)
 
     def testDescendShorthand(self):
         query = "ProcessParent.ProcessParent.ProcessName"
         expected = ast.Map(
-            ast.Binding("ProcessParent"),
+            ast.Var("ProcessParent"),
             ast.Map(
-                ast.Binding("ProcessParent"),
-                ast.Binding("ProcessName")))
+                ast.Var("ProcessParent"),
+                ast.Var("ProcessName")))
         self.assertQueryMatches(query, expected)
 
     def testEquivalence(self):
@@ -157,7 +157,7 @@ class ParserTest(unittest.TestCase):
                     ast.Literal(1),
                     ast.Literal(5))),
             ast.Equivalence(
-                ast.Binding("ProcessName"),
+                ast.Var("ProcessName"),
                 ast.Literal("init")))
         self.assertQueryMatches(query, expected)
 
@@ -165,29 +165,29 @@ class ParserTest(unittest.TestCase):
         query = "any foo where bar == 10 and each baz where foo == 10"
         expected = ast.Intersection(
             ast.Any(
-                ast.Binding("foo"),
+                ast.Var("foo"),
                 ast.Equivalence(
-                    ast.Binding("bar"),
+                    ast.Var("bar"),
                     ast.Literal(10))),
             ast.Each(
-                ast.Binding("baz"),
+                ast.Var("baz"),
                 ast.Equivalence(
-                    ast.Binding("foo"),
+                    ast.Var("foo"),
                     ast.Literal(10))))
         self.assertQueryMatches(query, expected)
 
         # Parens can be used to force the second half to be a subquery.
         query = "any foo where (bar == 10 and each baz where foo == 10)"
         expected = ast.Any(
-            ast.Binding('foo'),
+            ast.Var('foo'),
             ast.Intersection(
                 ast.Equivalence(
-                    ast.Binding('bar'),
+                    ast.Var('bar'),
                     ast.Literal(10)),
                 ast.Each(
-                    ast.Binding('baz'),
+                    ast.Var('baz'),
                     ast.Equivalence(
-                        ast.Binding('foo'),
+                        ast.Var('foo'),
                         ast.Literal(10)))))
         self.assertQueryMatches(query, expected)
 
@@ -245,8 +245,8 @@ class ParserTest(unittest.TestCase):
         query = "ProcessParent.ProcessCommand == 'init'"
         expected = ast.Equivalence(
             ast.Map(
-                ast.Binding("ProcessParent"),
-                ast.Binding("ProcessCommand")),
+                ast.Var("ProcessParent"),
+                ast.Var("ProcessCommand")),
             ast.Literal("init"))
 
         self.assertQueryMatches(query, expected)
@@ -255,13 +255,13 @@ class ParserTest(unittest.TestCase):
         query = ("ProcessParent.(ProcessCommand == 'init' and "
                  "ProcessPid == 1)")
         expected = ast.Map(
-            ast.Binding("ProcessParent"),
+            ast.Var("ProcessParent"),
             ast.Intersection(
                 ast.Equivalence(
-                    ast.Binding("ProcessCommand"),
+                    ast.Var("ProcessCommand"),
                     ast.Literal("init")),
                 ast.Equivalence(
-                    ast.Binding("ProcessPid"),
+                    ast.Var("ProcessPid"),
                     ast.Literal(1))))
 
         self.assertQueryMatches(query, expected)
@@ -270,10 +270,10 @@ class ParserTest(unittest.TestCase):
         query = "any Process.parent where name == 'init'"
         expected = ast.Any(
             ast.Map(
-                ast.Binding("Process"),
-                ast.Binding("parent")),
+                ast.Var("Process"),
+                ast.Var("parent")),
             ast.Equivalence(
-                ast.Binding("name"),
+                ast.Var("name"),
                 ast.Literal("init")))
 
         self.assertQueryMatches(query, expected)
@@ -281,9 +281,9 @@ class ParserTest(unittest.TestCase):
     def testEach(self):
         query = "each ProcessChildren where ProcessCommand == 'foo'"
         expected = ast.Each(
-            ast.Binding("ProcessChildren"),
+            ast.Var("ProcessChildren"),
             ast.Equivalence(
-                ast.Binding("ProcessCommand"),
+                ast.Var("ProcessCommand"),
                 ast.Literal("foo")))
 
         self.assertQueryMatches(query, expected)
@@ -308,16 +308,16 @@ class ParserTest(unittest.TestCase):
         expected = ast.Union(
             ast.Intersection(
                 ast.Equivalence(
-                    ast.Binding("ProcessPid"),
+                    ast.Var("ProcessPid"),
                     ast.Literal(1)),
                 ast.Membership(
-                    ast.Binding("ProcessCommand"),
+                    ast.Var("ProcessCommand"),
                     ast.Literal(("init", "initd")))),
             ast.Any(
-                ast.Binding("ProcessChildren"),
+                ast.Var("ProcessChildren"),
                 ast.Complement(
                     ast.Membership(
-                        ast.Binding("ProcessCommand"),
+                        ast.Var("ProcessCommand"),
                         ast.Literal(("launchd", "foo"))))))
 
         self.assertQueryMatches(query, expected)
@@ -333,7 +333,7 @@ class ParserTest(unittest.TestCase):
     def testNestedParens(self):
         query = "ProcessPid in ((1,2))"
         expected = ast.Membership(
-            ast.Binding("ProcessPid"),
+            ast.Var("ProcessPid"),
             ast.Literal((1, 2)))
         self.assertQueryMatches(query, expected)
 
@@ -361,30 +361,30 @@ class ParserTest(unittest.TestCase):
 
     def testIsa(self):
         query = "proc isa Process"
-        expected = ast.IsInstance(ast.Binding("proc"), ast.Binding("Process"))
+        expected = ast.IsInstance(ast.Var("proc"), ast.Var("Process"))
         self.assertQueryMatches(query, expected)
 
         # Nested maps?
         query = "Process.parent isa Process"
         expected = ast.IsInstance(
             ast.Map(
-                ast.Binding("Process"),
-                ast.Binding("parent")),
-            ast.Binding("Process"))
+                ast.Var("Process"),
+                ast.Var("parent")),
+            ast.Var("Process"))
         self.assertQueryMatches(query, expected)
 
     def testTemplateReplacements(self):
         query = "ProcessPid == {}"
         params = [1]
         exptected = ast.Equivalence(
-            ast.Binding("ProcessPid"),
+            ast.Var("ProcessPid"),
             ast.Literal(1))
         self.assertQueryMatches(query, exptected, params=params)
 
         query = "ProcessPid == {pid}"
         params = {"pid": 1}
         exptected = ast.Equivalence(
-            ast.Binding("ProcessPid"),
+            ast.Var("ProcessPid"),
             ast.Literal(1))
         self.assertQueryMatches(query, exptected, params=params)
 
@@ -394,7 +394,7 @@ class ParserTest(unittest.TestCase):
         self.assertQueryRaises(query, params=params)
 
         # Even fixing the above, the left side should be a literal, not a
-        # binding.
+        # var.
         query = "{foo} == 1"
         params = {"foo": "ProcessPid"}
         exptected = ast.Equivalence(
@@ -414,5 +414,5 @@ class ParserTest(unittest.TestCase):
             self.assertEqual(e.token.value, 'name')
 
     def testMultipleLiterals(self):
-        query = "ProcessBinding foo foo bar 15"
+        query = "ProcessVar foo foo bar 15"
         self.assertQueryRaises(query)

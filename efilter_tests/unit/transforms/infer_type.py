@@ -36,7 +36,7 @@ class InferTypeTest(testlib.EfilterTestCase):
     def testQuery(self):
         """Get coverage test to shut up."""
 
-    def testBinding(self):
+    def testVar(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("Process.pid"),
@@ -50,7 +50,7 @@ class InferTypeTest(testlib.EfilterTestCase):
                 mocks.MockRootType),
             number.INumber)
 
-    def testBinding(self):
+    def testVar(self):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("foo"),
@@ -71,6 +71,14 @@ class InferTypeTest(testlib.EfilterTestCase):
                 mocks.MockRootType),
             boolean.IBoolean)
 
+    def testReverse(self):
+        """Reverse should preserve the type of the operand."""
+        self.assertIsa(
+            infer_type.infer_type(
+                q.Query(("reverse", ("repeat", 1, 2, 3))),
+                mocks.MockRootType),
+            number.INumber)
+
     def testIsInstance(self):
         self.assertIsa(
             infer_type.infer_type(
@@ -84,6 +92,19 @@ class InferTypeTest(testlib.EfilterTestCase):
                 q.Query("'foo' in ('bar', 'foo')"),
                 mocks.MockRootType),
             boolean.IBoolean)
+
+    def testSelect(self):
+        self.assertIsa(
+            infer_type.infer_type(
+                q.Query("Process['pid']", syntax="dottysql"),
+                mocks.MockRootType),
+            number.INumber)
+
+        self.assertEquals(
+            infer_type.infer_type(
+                q.Query("Process[var_name]", syntax="dottysql"),
+                mocks.MockRootType),
+            protocol.AnyType)
 
     def testAny(self):
         self.assertIsa(
@@ -109,6 +130,20 @@ class InferTypeTest(testlib.EfilterTestCase):
         self.assertIsa(
             infer_type.infer_type(
                 q.Query("10 * (1 - 4) / 5"),
+                mocks.MockRootType),
+            number.INumber)
+
+    def testApply(self):
+        self.assertIsa(
+            infer_type.infer_type(
+                q.Query("mock_func(5, 10)", syntax="dottysql"),
+                mocks.MockRootType),
+            number.INumber)
+
+    def testRepeat(self):
+        self.assertIsa(
+            infer_type.infer_type(
+                q.Query(("repeat", 1, 2, 3)),
                 mocks.MockRootType),
             number.INumber)
 

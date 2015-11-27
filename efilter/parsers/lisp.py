@@ -29,24 +29,31 @@ from efilter import syntax
 
 
 EXPRESSIONS = {
-    "var": ast.Binding,
+    "var": ast.Var,
     "!": ast.Complement,
+    "reverse": ast.Reverse,
+    "pair": ast.Pair,
+    "select": ast.Select,
+    "isa": ast.IsInstance,
     "map": ast.Map,
+    "filter": ast.Filter,
+    "sort": ast.Sort,
     "any": ast.Any,
     "each": ast.Each,
-    "find": ast.Filter,
-    "sort": ast.Sort,
     "in": ast.Membership,
-    "regex": ast.RegexFilter,
+    "apply": ast.Apply,
+    "repeat": ast.Repeat,
     "|": ast.Union,
     "&": ast.Intersection,
     ">": ast.StrictOrderedSet,
     ">=": ast.PartialOrderedSet,
     "==": ast.Equivalence,
+    "=~": ast.RegexFilter,
     "+": ast.Sum,
     "-": ast.Difference,
     "*": ast.Product,
     "/": ast.Quotient,
+    "literal": ast.Literal,
 }
 
 
@@ -67,9 +74,9 @@ class Parser(syntax.Syntax):
         car = atom[0]
         cdr = atom[1:]
 
-        # Bindings are a little special.
+        # Vars are a little special.
         if car == "var":
-            return ast.Binding(cdr[0])
+            return ast.Var(cdr[0])
 
         return EXPRESSIONS[car](*(self._parse_atom(a) for a in cdr))
 

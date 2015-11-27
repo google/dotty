@@ -111,7 +111,7 @@ class EfilterKeyError(EfilterError):
         return None
 
     def __init__(self, *args, **kwargs):
-        self.expected = kwargs.pop("key")
+        self.expected = kwargs.pop("key", None)
 
         super(EfilterKeyError, self).__init__(*args, **kwargs)
 
@@ -132,7 +132,7 @@ class EfilterTypeError(EfilterError):
         return None
 
     def __init__(self, *args, **kwargs):
-        self.expected = kwargs.pop("expected")
-        self.actual = kwargs.pop("actual")
+        self.expected = kwargs.pop("expected", None)
+        self.actual = kwargs.pop("actual", None)
 
         super(EfilterTypeError, self).__init__(*args, **kwargs)

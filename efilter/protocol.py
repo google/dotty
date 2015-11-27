@@ -195,7 +195,7 @@ class Protocol(object):
     def implicit_dynamic(cls, for_type):
         """Automatically generate late dynamic dispatchers to type.
 
-        This is similar to 'implicit_static', except instead of binding the
+        This is similar to 'implicit_static', except instead of var the
         instance methods, it generates a dispatcher that will call whatever
         instance method of the same name happens to be available at time of
         dispatch.

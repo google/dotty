@@ -33,6 +33,7 @@ from efilter import protocol
 from efilter import query as q
 
 
+from efilter.protocols import applicative
 from efilter.protocols import associative
 from efilter.protocols import iset
 from efilter.protocols import reflective
@@ -43,16 +44,16 @@ Result = collections.namedtuple("Result", ["value", "branch", "sort_key"])
 
 
 @dispatch.multimethod
-def solve(query, bindings):
-    """Evaluate the 'query' using variables in 'bindings'.
+def solve(query, vars):
+    """Evaluate the 'query' using variables in 'vars'.
 
     Canonical implementation of the EFILTER AST's actual behavior. This may
     not be the most optimal way of executing the query, but it is guaranteed
     to have full coverage without falling through to some other implementation.
 
     Arguments:
-        query: The instance of Query to evaluate against data in bindings.
-        bindings: An object implementing IAssociative (like a dict) containing
+        query: The instance of Query to evaluate against data in vars.
+        vars: An object implementing IAssociative (like a dict) containing
             pairs of variable -> value.
 
     Returns:
@@ -67,18 +68,18 @@ def solve(query, bindings):
                 operators, which evaluate to booleans and can terminate early.
                 For other queries this will be set to None.
 
-            sort_key: A key by which the 'bindings' should be sorted with
-                respect to other groups of bindings of the same type. Not
+            sort_key: A key by which the 'vars' should be sorted with
+                respect to other groups of vars of the same type. Not
                 currently implemented.
     """
-    _ = query, bindings
+    _ = query, vars
     raise NotImplementedError()
 
 
 @solve.implementation(for_type=q.Query)
-def solve(query, bindings):
+def solve(query, vars):
     try:
-        return solve(query.root, bindings)
+        return solve(query.root, vars)
     except errors.EfilterError as error:
         if not error.query:
             error.query = query.source
@@ -86,23 +87,23 @@ def solve(query, bindings):
 
 
 @solve.implementation(for_type=ast.Literal)
-def solve(expr, bindings):
+def solve(expr, vars):
     """Returns just the value of literal."""
-    _ = bindings
+    _ = vars
     return Result(expr.value, (), ())
 
 
-@solve.implementation(for_type=ast.Binding)
-def solve(expr, bindings):
-    """Returns the value of the binding (var) named in the expression."""
+@solve.implementation(for_type=ast.Var)
+def solve(expr, vars):
+    """Returns the value of the var (var) named in the expression."""
     try:
-        return Result(associative.resolve(bindings, expr.value), (), ())
+        return Result(associative.resolve(vars, expr.value), (), ())
     except (KeyError, AttributeError) as e:
         # Raise a better exception for accessing a non-existent member.
         raise errors.EfilterKeyError(root=expr, key=expr.value, message=e)
     except (TypeError, ValueError) as e:
         # Raise a better exception for what is probably a null pointer error.
-        if isinstance(bindings, type(None)):
+        if vars is None:
             raise errors.EfilterNoneError(
                 root=expr,
                 message="Trying to access member %r of a null." % expr.value)
@@ -112,25 +113,109 @@ def solve(expr, bindings):
         raise errors.EfilterError(
             root=expr,
             message="Trying to access member %r of an instance of %r." %
-            (expr.value, type(bindings)))
+            (expr.value, type(vars)))
+
+
+@solve.implementation(for_type=ast.Select)
+def solve(expr, vars):
+    """Use IAssociative.select to get key (rhs) from the data (lhs)."""
+    data = solve(expr.lhs, vars).value
+    key = solve(expr.rhs, vars).value
+
+    try:
+        result = associative.select(data, key)
+    except (KeyError, AttributeError) as e:
+        # Raise a better exception for accessing a non-existent member.
+        raise errors.EfilterKeyError(root=expr, key=expr.value, message=e)
+    except (TypeError, ValueError) as e:
+        # Raise a better exception for what is probably a null pointer error.
+        if vars is None:
+            raise errors.EfilterNoneError(
+                root=expr,
+                message="Cannot select key %r from a null." % key)
+        else:
+            raise
+    except NotImplementedError as e:
+        raise errors.EfilterError(
+            root=expr,
+            message="Cannot select keys from a non-associative value.")
+
+    return Result(result, (), ())
+
+
+@solve.implementation(for_type=ast.Apply)
+def solve(expr, vars):
+    """Returns the result of applying function (lhs) to its arguments (rest).
+
+    We use IApplicative to apply the function, because that gives the host
+    application an opportunity to compare the function being called against
+    a whitelist. EFILTER will never directly call a function that wasn't
+    provided through a protocol implementation.
+    """
+    func = solve(expr.func, vars).value
+    args = []
+    kwargs = {}
+    for arg in expr.args:
+        if isinstance(arg, ast.Pair):
+            if not isinstance(arg.lhs, ast.Var):
+                raise errors.EfilterError(
+                    root=arg.lhs,
+                    message="Invalid argument name.")
+
+            kwargs[arg.key.value] = solve(arg.value, vars).value
+        else:
+            args.append(solve(arg, vars).value)
+
+    result = applicative.apply(func, args, kwargs)
+
+    return Result(result, (), ())
+
+
+@solve.implementation(for_type=ast.Bind)
+def solve(expr, vars):
+    """Build a dict from key/value pairs under the bind."""
+    result = {}
+    for pair in expr.children:
+        if not isinstance(pair, ast.Pair):
+            raise errors.EfilterError(
+                root=pair,
+                message="Bind expression must consist of key/value pairs.")
+
+        key = solve(pair.key, vars).value
+        value = solve(pair.value, vars).value
+        result[key] = value
+
+    return Result(result, (), ())
+
+
+@solve.implementation(for_type=ast.Repeat)
+def solve(expr, vars):
+    """Build a repeated value from subexpressions."""
+    try:
+        result = repeated.meld(*[solve(x, vars).value for x in expr.children])
+        return Result(result, (), ())
+    except TypeError:
+        raise errors.EfilterTypeError(
+            root=expr,
+            message="All values in a repeated value must be of the same type.")
 
 
 @solve.implementation(for_type=ast.Map)
-def solve(expr, bindings):
-    """Solves the map-form, by recursively calling its RHS with new bindings.
+def solve(expr, vars):
+    """Solves the map-form, by recursively calling its RHS with new vars.
 
     let-forms are binary expressions. The LHS should evaluate to an IAssociative
-    that can be used as new bindings with which to solve a new query, of which
-    the RHS is the root. In most cases, the LHS will be a Binding (var).
+    that can be used as new vars with which to solve a new query, of which
+    the RHS is the root. In most cases, the LHS will be a Var (var).
 
     Typically, map-forms result from the dotty "dot" (.) operator. For example,
-    the query "User.name" will translate to a map-form with the binding "User"
-    on LHS and a binding to "name" on the RHS. With top-level bindings being
-    something like {"User": {"name": "Bob"}}, the Binding on the LHS will
+    the query "User.name" will translate to a map-form with the var "User"
+    on LHS and a var to "name" on the RHS. With top-level vars being
+    something like {"User": {"name": "Bob"}}, the Var on the LHS will
     evaluate to {"name": "Bob"}, which subdict will then be used on the RHS as
-    new bindings, and that whole form will evaluate to "Bob".
+    new vars, and that whole form will evaluate to "Bob".
     """
-    lhs = solve(expr.lhs, bindings)
+    lhs = solve(expr.lhs, vars)
 
     try:
         values = []
@@ -145,12 +230,12 @@ def solve(expr, bindings):
 
 
 @solve.implementation(for_type=ast.Filter)
-def solve(expr, bindings):
+def solve(expr, vars):
     """Filter values on the LHS by evaluating RHS with each value.
 
     Returns any LHS values for which RHS evaluates to a true value.
     """
-    lhs = solve(expr.lhs, bindings)
+    lhs = solve(expr.lhs, vars)
 
     results = []
     for value in repeated.getvalues(lhs.value):
@@ -161,15 +246,15 @@ def solve(expr, bindings):
 
 
 @solve.implementation(for_type=ast.Sort)
-def sort(expr, bindings):
+def sort(expr, vars):
     """Sort values on the LHS by the value they yield when passed to RHS."""
-    values = repeated.getvalues(solve(expr.lhs, bindings).value)
+    values = repeated.getvalues(solve(expr.lhs, vars).value)
     values = sorted(values, key=lambda val: solve(expr.rhs, val))
     return Result(repeated.meld(*values), (), ())
 
 
 @solve.implementation(for_type=ast.Each)
-def solve(expr, bindings):
+def solve(expr, vars):
     """Return True if RHS evaluates to a true value with each state of LHS.
 
     If LHS evaluates to a normal IAssociative object then this is the same as
@@ -178,8 +263,8 @@ def solve(expr, bindings):
     IAssociative objects then RHS will be evaluated with each state and True
     will be returned only if each result is true.
     """
-    branch_bindings = solve(expr.lhs, bindings).value
-    for state in repeated.getvalues(branch_bindings):
+    branch_vars = solve(expr.lhs, vars).value
+    for state in repeated.getvalues(branch_vars):
         result = solve(expr.rhs, state)
         if not result.value:
             return result
@@ -188,11 +273,11 @@ def solve(expr, bindings):
 
 
 @solve.implementation(for_type=ast.Any)
-def solve(expr, bindings):
+def solve(expr, vars):
     """Same as Each, except returning True on first true result at LHS."""
-    branch_bindings = solve(expr.lhs, bindings).value
+    branch_vars = solve(expr.lhs, vars).value
     result = Result(False, (), ())
-    for state in repeated.getvalues(branch_bindings):
+    for state in repeated.getvalues(branch_vars):
         result = solve(expr.rhs, state)
         if result.value:
             return result
@@ -201,34 +286,48 @@ def solve(expr, bindings):
 
 
 @solve.implementation(for_type=ast.IsInstance)
-def solve(expr, bindings):
+def solve(expr, vars):
     """Typecheck whether LHS is type on the RHS."""
-    lhs = solve(expr.lhs, bindings)
-    t = reflective.reflect(type(bindings), expr.rhs)
+    lhs = solve(expr.lhs, vars)
+    t = reflective.reflect(type(vars), expr.rhs)
     return Result(protocol.implements(lhs.value, t), (), ())
 
 
 @solve.implementation(for_type=ast.Complement)
-def solve(expr, bindings):
-    result = solve(expr.value, bindings)
+def solve(expr, vars):
+    result = solve(expr.value, vars)
     return result._replace(value=not result.value)
 
 
+@solve.implementation(for_type=ast.Reverse)
+def solve(expr, vars):
+    """Reverse the order of values in a repeated value (not a list literal)."""
+    values = repeated.getvalues(solve(expr.value, vars).value)
+    result = repeated.meld(*reversed(values))
+    return Result(result, (), ())
+
+
 @solve.implementation(for_type=ast.Intersection)
-def solve(expr, bindings):
+def solve(expr, vars):
     result = Result(False, (), ())
     for child in expr.children:
-        result = solve(child, bindings)
+        result = solve(child, vars)
         if not result.value:
             return result
 
     return result
 
 
+@solve.implementation(for_type=ast.Pair)
+def solve(expr, vars):
+    return Result((solve(expr.lhs, vars).value, solve(expr.rhs, vars).value),
+                  (), ())
+
+
 @solve.implementation(for_type=ast.Union)
-def solve(expr, bindings):
+def solve(expr, vars):
     for child in expr.children:
-        result = solve(child, bindings)
+        result = solve(child, vars)
         if result.value:
             return result._replace(branch=child)
 
@@ -236,76 +335,76 @@ def solve(expr, bindings):
 
 
 @solve.implementation(for_type=ast.Sum)
-def solve(expr, bindings):
+def solve(expr, vars):
     total = 0
     for child in expr.children:
-        total += solve(child, bindings).value
+        total += solve(child, vars).value
 
     return Result(total, (), ())
 
 
 @solve.implementation(for_type=ast.Difference)
-def solve(expr, bindings):
+def solve(expr, vars):
     children = iter(expr.children)
-    difference = solve(next(children), bindings).value
+    difference = solve(next(children), vars).value
     for child in children:
-        difference -= solve(child, bindings).value
+        difference -= solve(child, vars).value
 
     return Result(difference, (), ())
 
 
 @solve.implementation(for_type=ast.Product)
-def solve(expr, bindings):
+def solve(expr, vars):
     product = 1
     for child in expr.children:
-        product *= solve(child, bindings).value
+        product *= solve(child, vars).value
 
     return Result(product, (), ())
 
 
 @solve.implementation(for_type=ast.Quotient)
-def solve(expr, bindings):
+def solve(expr, vars):
     children = iter(expr.children)
-    quotient = solve(next(children), bindings).value
+    quotient = solve(next(children), vars).value
     for child in children:
-        quotient /= solve(child, bindings).value
+        quotient /= solve(child, vars).value
 
     return Result(quotient, (), ())
 
 
 @solve.implementation(for_type=ast.Equivalence)
-def solve(expr, bindings):
+def solve(expr, vars):
     children = iter(expr.children)
-    first_value = solve(next(children), bindings).value
+    first_value = solve(next(children), vars).value
     for child in children:
-        if solve(child, bindings).value != first_value:
+        if solve(child, vars).value != first_value:
             return Result(False, (), ())
 
     return Result(True, (), ())
 
 
 @solve.implementation(for_type=ast.Membership)
-def solve(expr, bindings):
-    element = solve(expr.element, bindings).value
-    values = solve(expr.set, bindings).value
+def solve(expr, vars):
+    element = solve(expr.element, vars).value
+    values = solve(expr.set, vars).value
     return Result(element in values, (), ())
 
 
 @solve.implementation(for_type=ast.RegexFilter)
-def solve(expr, bindings):
-    string = solve(expr.string, bindings).value
-    pattern = solve(expr.regex, bindings).value
+def solve(expr, vars):
+    string = solve(expr.string, vars).value
+    pattern = solve(expr.regex, vars).value
 
     return Result(re.compile(pattern).match(str(string)), (), ())
 
 
 @solve.implementation(for_type=ast.ContainmentOrder)
-def solve(expr, bindings):
-    _ = bindings
+def solve(expr, vars):
+    _ = vars
     iterator = iter(expr.children)
-    x = solve(next(iterator), bindings).value
+    x = solve(next(iterator), vars).value
     for y in iterator:
-        y = solve(y, bindings).value
+        y = solve(y, vars).value
         if not iset.issubset(x, y):
             return Result(False, (), ())
         x = y
@@ -314,15 +413,15 @@ def solve(expr, bindings):
 
 
 @solve.implementation(for_type=ast.StrictOrderedSet)
-def solve(expr, bindings):
+def solve(expr, vars):
     iterator = iter(expr.children)
-    min_ = solve(next(iterator), bindings).value
+    min_ = solve(next(iterator), vars).value
 
     if min_ is None:
         return Result(False, (), ())
 
     for child in iterator:
-        val = solve(child, bindings).value
+        val = solve(child, vars).value
 
         if not min_ > val or val is None:
             return Result(False, (), ())
@@ -333,15 +432,15 @@ def solve(expr, bindings):
 
 
 @solve.implementation(for_type=ast.PartialOrderedSet)
-def solve(expr, bindings):
+def solve(expr, vars):
     iterator = iter(expr.children)
-    min_ = solve(next(iterator), bindings).value
+    min_ = solve(next(iterator), vars).value
 
     if min_ is None:
         return Result(False, (), ())
 
     for child in iterator:
-        val = solve(child, bindings).value
+        val = solve(child, vars).value
 
         if min_ < val or val is None:
             return Result(False, (), ())

@@ -20,12 +20,14 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-from efilter import ast
 from efilter import query
 
 from efilter.transforms import normalize
 
 from efilter_tests import testlib
+
+# Pylint is so broken... This is to stop it bitching about the nested tuples.
+# pylint: disable=bad-continuation
 
 
 class NormalizeTest(testlib.EfilterTestCase):
@@ -37,88 +39,81 @@ class NormalizeTest(testlib.EfilterTestCase):
         """Nothing to test, really."""
         pass
 
+    def testReverse(self):
+        """Make sure that reverse gets normalized."""
+        original = query.Query(
+            ("reverse",
+                ("repeat",
+                    ("var", "x"),
+                    ("var", "y"),
+                    ("|", 1, ("|", 2, 3)))))
+
+        expected = query.Query(
+            ("reverse",
+                ("repeat",
+                    ("var", "x"),
+                    ("var", "y"),
+                    ("|", 1, 2, 3))))
+
+        self.assertEqual(normalize.normalize(original), expected)
+
     def testBinaryExpression(self):
-        """Test that binary expressions can be eliminated.
+        """Make sure binary expressions are normalized."""
+        original = query.Query(
+            ("pair",
+                ("literal", "x"),
+                ("|", ("var", "x"), ("|", ("var", "y"), ("var", "z")))))
 
-        I can't actually think of a scenario where we'd ever get the below
-        AST from any of the parsers, but we do have code to handle it so
-        we should have a test for it.
-        """
-        self.assertEqual(
-            query.Query(
-                ast.Intersection(
-                    ast.Membership(
-                        None,
-                        ast.Literal((1, 2)))),
-                ast.Literal("5")),
-            query.Query(
-                ast.Literal("5")))
+        expected = query.Query(
+            ("pair",
+                ("literal", "x"),
+                ("|", ("var", "x"), ("var", "y"), ("var", "z"))))
 
-    def testEquivalence(self):
-        self.assertEqual(
-            query.Query("ProcessName == 'init'"),
-            normalize.normalize(query.Query("ProcessName == 'init'")))
+        self.assertEqual(normalize.normalize(original), expected)
 
     def testVariadicExpression(self):
-        self.assertEqual(
-            query.Query(ast.Literal(True)),
-            normalize.normalize(query.Query(("&", True))))
-
-    def testWithin(self):
+        """Make sure variadic expressions are normalized."""
         original = query.Query(
-            ("each",
-             ("var", "parent"),
-             ("var", "name")))
+            ("&",
+                ("|", ("var", "x"), ("|", ("var", "y"), ("var", "z"))),
+                ("var", "w")))
 
-        self.assertEqual(
-            original,
-            normalize.normalize(original))
+        expected = query.Query(
+            ("&",
+                ("|", ("var", "x"), ("var", "y"), ("var", "z")),
+                ("var", "w")))
 
+        self.assertEqual(normalize.normalize(original), expected)
+
+    def testVariadicExpressionElimination(self):
+        """Make sure variadic expressions are eliminated."""
+        original = query.Query(("&", ("var", "w")))
+        expected = query.Query(("var", "w"))
+
+        self.assertEqual(normalize.normalize(original), expected)
+
+    def testVariadicExpressionMerging(self):
+        """Make sure variadic expressions are collapsed."""
         original = query.Query(
-            ("any",
-             ("map", ("var", "Process"), ("var", "parent")),
-             ("==", ("var", "name"), "init")))
+            ("|", ("var", "x"), ("|", ("var", "y"), ("var", "z"))))
 
-        self.assertEqual(
-            original,
-            normalize.normalize(original))
+        expected = query.Query(
+            ("|", ("var", "x"), ("var", "y"), ("var", "z")))
 
-    def testMap(self):
-        original = ("&",
-                    ("map",
-                     ("map", ("var", "MemoryDescriptor"), ("var", "process")),
-                     ("==",
-                      ("map", ("var", "Process"), ("var", "command")),
-                      "Adium")),
-                    ("&",
-                     ("in", "execute",
-                      ("map",
-                       ("var", "MemoryDescriptor"),
-                       ("var", "permissions"))),
-                     ("in", "write",
-                      ("map",
-                       ("var", "MemoryDescriptor"),
-                       ("var", "permissions")))))
+        self.assertEqual(normalize.normalize(original), expected)
 
-        # Two binary intersections become one variadic intersection and the
-        # map-forms now have a Binding as their LHS whenever possible.
-        expected = ("&",
-                    ("map",
-                     ("var", "MemoryDescriptor"),
-                     ("map",
-                      ("var", "process"),
-                      ("==",
-                       ("map", ("var", "Process"), ("var", "command")),
-                       "Adium"))),
-                    ("in", "execute",
-                     ("map",
-                      ("var", "MemoryDescriptor"),
-                      ("var", "permissions"))),
-                    ("in", "write",
-                     ("map",
-                      ("var", "MemoryDescriptor"),
-                      ("var", "permissions"))))
+    def testApply(self):
+        """Make sure arguments to functions are normalized."""
+        original = query.Query(
+            ("apply",
+                ("var", "f"),
+                ("|", ("var", "x"), ("|", ("var", "y"), ("var", "z"))),
+                ("var", "w")))
 
-        self.assertEqual(
-            query.Query(expected),
-            normalize.normalize(query.Query(original)))
+        expected = query.Query(
+            ("apply",
+                ("var", "f"),
+                ("|", ("var", "x"), ("var", "y"), ("var", "z")),
+                ("var", "w")))
+
+        self.assertEqual(normalize.normalize(original), expected)
