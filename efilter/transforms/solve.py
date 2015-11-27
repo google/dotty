@@ -200,6 +200,13 @@ def solve(expr, vars):
             message="All values in a repeated value must be of the same type.")
 
 
+@solve.implementation(for_type=ast.Tuple)
+def solve(expr, vars):
+    """Build a tuple from subexpressions."""
+    result = tuple(solve(x, vars).value for x in expr.children)
+    return Result(result, (), ())
+
+
 @solve.implementation(for_type=ast.Map)
 def solve(expr, vars):
     """Solves the map-form, by recursively calling its RHS with new vars.

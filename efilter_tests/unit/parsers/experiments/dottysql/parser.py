@@ -42,12 +42,8 @@ class ParserTest(unittest.TestCase):
         self.assertQueryMatches("5", ast.Literal(5))
         self.assertQueryRaises("5)")
 
-        # Lists:
-        self.assertQueryMatches("[1, 2, 3]", ast.Literal([1, 2, 3]))
-
         # Strings:
         self.assertQueryMatches("'foo'", ast.Literal("foo"))
-        self.assertQueryMatches("['foo']", ast.Literal(["foo"]))
 
         # Booleans:
         self.assertQueryMatches("true", ast.Literal(True))
@@ -128,6 +124,37 @@ class ParserTest(unittest.TestCase):
                             ast.Literal(5)),
                         ast.Literal(5))),
                 ast.Literal(10)))
+
+    def testBuiltins(self):
+        self.assertQueryMatches(
+            "filter(pslist(), proc.pid == 1)",
+            ast.Filter(
+                ast.Apply(ast.Var("pslist")),
+                ast.Equivalence(
+                    ast.Map(
+                        ast.Var("proc"),
+                        ast.Var("pid")),
+                    ast.Literal(1))))
+
+        self.assertQueryMatches(
+            "map(pslist(), [proc.pid, proc['command']])",
+            ast.Map(
+                ast.Apply(ast.Var("pslist")),
+                ast.Tuple(
+                    ast.Map(
+                        ast.Var("proc"),
+                        ast.Var("pid")),
+                    ast.Select(
+                        ast.Var("proc"),
+                        ast.Literal("command")))))
+
+        self.assertQueryMatches(
+            "bind(x: 1, y: 2)",
+            ast.Bind(
+                ast.Pair(ast.Var("x"), ast.Literal(1)),
+                ast.Pair(ast.Var("y"), ast.Literal(2))))
+
+        self.assertQueryRaises("bind (x: 1, y: 2)")
 
     def testInfix(self):
         self.assertQueryMatches(
@@ -218,10 +245,20 @@ class ParserTest(unittest.TestCase):
     def testListLiterals(self):
         self.assertQueryMatches(
             "[1, 2, 3]",
-            ast.Literal([1, 2, 3]))
+            ast.Tuple(
+                ast.Literal(1),
+                ast.Literal(2),
+                ast.Literal(3)))
 
         # Empty list literals should work.
-        self.assertQueryMatches("[]", ast.Literal([]))
+        self.assertQueryMatches("[]", ast.Tuple())
+
+        # Arbitrary AST should now be allowed in lists.
+        self.assertQueryMatches(
+            "[x, f(x)]",
+            ast.Tuple(
+                ast.Var("x"),
+                ast.Apply(ast.Var("f"), ast.Var("x"))))
 
     def testKVPairs(self):
         self.assertQueryMatches(
@@ -235,7 +272,7 @@ class ParserTest(unittest.TestCase):
                 ast.Var("f"),
                 ast.Literal(10),
                 ast.Pair(ast.Literal("strings"),
-                         ast.Literal(["foo", "bar"]))))
+                         ast.Tuple(ast.Literal("foo"), ast.Literal("bar")))))
 
         # They can also appear in repeated values, forming a logical dictionary:
         self.assertQueryMatches(

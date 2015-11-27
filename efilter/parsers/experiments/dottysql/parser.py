@@ -161,7 +161,14 @@ class Parser(syntax.Syntax):
         if match:
             return match
 
-        return self.error(start_token=self.lexer.peek())
+        try:
+            func_name = f.func_name
+        except AttributeError:
+            func_name = "<unnamed grammar construct>"
+
+        return self.error(
+            start_token=self.lexer.peek(0),
+            message="Was expecting a %s here." % func_name)
 
     def reject(self, f):
         match = self.match(f)
@@ -238,6 +245,11 @@ class Parser(syntax.Syntax):
             return ast.Literal(self.matched_value,
                                start=self.matched_start, end=self.matched_end)
 
+        # Match builtin pseudo-functions before functions and vars to prevent
+        # overrides.
+        if self.accept(grammar.builtin):
+            return self.builtin(self.matched_value)
+
         # Match applications before vars, because obviously.
         if self.accept(grammar.application):
             return self.application(
@@ -252,11 +264,9 @@ class Parser(syntax.Syntax):
             # Parens will contain one or more expressions. If there are several
             # expressions, separated by commas, then they are a repeated value.
             #
-            # Unlike lists, in which only literals are permitted, repeated
-            # values may contain arbitrary AST to be resolved at runtime (see
-            # ast.Repeat). However, also unlike lists, repeated values must
-            # all be of the same type, otherwise evaluation of the query will
-            # fail at runtime (or type-check time, for simple cases.)
+            # Unlike lists, repeated values must all be of the same type,
+            # otherwise evaluation of the query will fail at runtime (or
+            # type-check time, for simple cases.)
             start = self.matched_start
             expressions = [self.expression()]
 
@@ -458,6 +468,34 @@ class Parser(syntax.Syntax):
 
         return sort_expression
 
+    # Builtin pseudo-function application subgrammar.
+
+    def builtin(self, keyword):
+        """Parse the pseudo-function application subgrammar."""
+        keyword_start = self.matched_start
+        keyword_end = self.matched_end
+        self.expect(grammar.lparen)
+
+        if self.matched_start != keyword_end:
+            return self.error(
+                "No whitespace allowed between function and lparen.",
+                start_token=self.matched_tokens[0])
+
+        expr_type = grammar.BUILTINS[keyword.lower()]
+        arguments = [self.expression()]
+        while self.accept(grammar.comma):
+            arguments.append(self.expression())
+
+        self.expect(grammar.rparen)
+
+        if expr_type.arity and expr_type.arity != len(arguments):
+            return self.error(
+                "%s expects %d arguments, but was passed %d." % (
+                    keyword, expr_type.arity, len(arguments)),
+                start_token=keyword)
+
+        return expr_type(*arguments, start=keyword_start, end=self.matched_end)
+
     # Function application subgrammar.
 
     def application(self, func):
@@ -489,24 +527,22 @@ class Parser(syntax.Syntax):
         self.expect(grammar.rparen)
         return ast.Apply(func, *arguments, start=start, end=self.matched_end)
 
-    # List grammar.
+    # Tuple grammar.
 
     def list(self):
-        """Parse a list, which can only contain literals."""
+        """Parse a list (tuple) which can contain any combination of types."""
         start = self.matched_start
 
         if self.accept(grammar.rbracket):
-            return ast.Literal([], start=start, end=self.matched_end)
+            return ast.Tuple(start=start, end=self.matched_end)
 
-        self.expect(grammar.literal)
-        elements = [self.matched_value]
+        elements = [self.expression()]
 
         while self.accept(grammar.comma):
-            self.expect(grammar.literal)
-            elements.append(self.matched_value)
+            elements.append(self.expression())
 
         self.expect(grammar.rbracket)
-        return ast.Literal(elements, start=start, end=self.matched_end)
+        return ast.Tuple(*elements, start=start, end=self.matched_end)
 
 
 syntax.Syntax.register_parser(Parser, shorthand="dottysql")

@@ -43,6 +43,7 @@ EXPRESSIONS = {
     "in": ast.Membership,
     "apply": ast.Apply,
     "repeat": ast.Repeat,
+    "tuple": ast.Tuple,
     "|": ast.Union,
     "&": ast.Intersection,
     ">": ast.StrictOrderedSet,

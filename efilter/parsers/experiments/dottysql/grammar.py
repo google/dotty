@@ -21,7 +21,6 @@ This module implements the DottySQL grammar (on tokens, not on a query string).
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import collections
-import itertools
 
 from efilter import ast
 from efilter import errors
@@ -59,21 +58,28 @@ def _keyword(tokens, keyword):
     """Case-insensitive keyword match."""
     token = next(iter(tokens))
     if token and token.name == "symbol" and token.value.lower() == keyword:
-        return TokenMatch(None, None, (token,))
+        return TokenMatch(None, token.value, (token,))
 
 
 def _multi_keyword(tokens, keyword_parts):
     """Match a case-insensitive keyword consisting of multiple tokens."""
+    tokens = iter(tokens)
     matched_tokens = []
     limit = len(keyword_parts)
-    for idx, token in enumerate(itertools.islice(tokens, 2)):
+
+    for idx in xrange(limit):
+        try:
+            token = next(tokens)
+        except StopIteration:
+            return
+
         if (not token or token.name != "symbol" or
                 token.value.lower() != keyword_parts[idx]):
             return
 
         matched_tokens.append(token)
 
-    return TokenMatch(None, None, matched_tokens)
+    return TokenMatch(None, token.value, matched_tokens)
 
 
 def _keywords(tokens, keywords):
@@ -85,7 +91,7 @@ def _keywords(tokens, keywords):
     """
     token = next(iter(tokens))
     if token and token.name == "symbol" and token.value.lower() in keywords:
-        return TokenMatch(None, None, (token,))
+        return TokenMatch(None, token.value, (token,))
 
 
 def _operator(tokens, operators):
@@ -214,7 +220,19 @@ PREFIX = collections.OrderedDict([
 
 
 SQL_KEYWORDS = frozenset([
-    "SELECT", "FROM", "ANY", "WHERE", "DESC", "ASC", "ORDER BY"])
+    "SELECT", "FROM", "ANY", "WHERE", "DESC", "ASC", "ORDER BY"
+])
+
+
+# Builtin pseudo-functions which cannot be overriden.
+BUILTINS = {
+    "map": ast.Map,
+    "sort": ast.Sort,
+    "filter": ast.Filter,
+    "bind": ast.Bind,
+    "any": ast.Any,
+    "each": ast.Each
+}
 
 
 # Additional grammar used by the parser.
@@ -266,6 +284,11 @@ def mixfix(tokens):
 def binary_operator(tokens):
     """Binary operators in dottysql are infix or mixfix (infix + postfix)."""
     return infix(tokens) or mixfix(tokens)
+
+
+def builtin(tokens):
+    """Matches a call to a builtin pseudo-function (like map or sort)."""
+    return _keywords(tokens, BUILTINS)
 
 
 def application(tokens):

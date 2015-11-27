@@ -66,9 +66,7 @@ class SolveTest(testlib.EfilterTestCase):
                 dict(multiply=lambda x, y: x * y))
 
     def testBind(self):
-        query = ast.Bind(
-            ast.Pair(ast.Literal("x"), ast.Literal(5)),
-            ast.Pair(ast.Literal("y"), ast.Literal(10)))
+        query = q.Query("bind('x': 5, 'y': 10)", syntax="dottysql")
 
         self.assertEqual(
             solve.solve(query, {}).value,
@@ -96,6 +94,17 @@ class SolveTest(testlib.EfilterTestCase):
         with self.assertRaises(errors.EfilterTypeError):
             query = q.Query("(1, 'foo', 3, 4)", syntax="dottysql")
             solve.solve(query, {})
+
+    def testTuple(self):
+        query = q.Query("[1, 2, 3]", syntax="dottysql")
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            (1, 2, 3))
+
+        query = q.Query("[x + 5, 1 == 1, y['foo']]", syntax="dottysql")
+        self.assertEqual(
+            solve.solve(query, {"x": 2, "y": {"foo": "bar"}}).value,
+            (7, True, "bar"))
 
     def testPair(self):
         query = q.Query("x: y", syntax="dottysql")

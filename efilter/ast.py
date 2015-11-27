@@ -301,6 +301,12 @@ class Repeat(VariadicExpression):
     return_signature = repeated.IRepeated
 
 
+class Tuple(VariadicExpression):
+    """Create a new tuple of values."""
+    type_signature = protocol.AnyType
+    return_signature = tuple
+
+
 ### Logical Variadic ###
 
 class LogicalOperation(VariadicExpression):
