@@ -44,6 +44,7 @@ EXPRESSIONS = {
     "apply": ast.Apply,
     "repeat": ast.Repeat,
     "tuple": ast.Tuple,
+    "bind": ast.Bind,
     "|": ast.Union,
     "&": ast.Intersection,
     ">": ast.StrictOrderedSet,
@@ -75,7 +76,7 @@ class Parser(syntax.Syntax):
         car = atom[0]
         cdr = atom[1:]
 
-        # Vars are a little special.
+        # Vars are a little special. Don't make the value a Literal.
         if car == "var":
             return ast.Var(cdr[0])
 

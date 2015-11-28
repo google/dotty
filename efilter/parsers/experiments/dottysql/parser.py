@@ -421,6 +421,8 @@ class Parser(syntax.Syntax):
                 if not name or name in used_names:
                     # Give up and just use the current watermark for key.
                     name = watermark
+                else:
+                    used_names.add(name)
 
                 key_expression = ast.Literal(name)
 

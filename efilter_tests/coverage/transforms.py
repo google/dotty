@@ -23,6 +23,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 from efilter import ast
 
 from efilter.transforms import asdotty
+from efilter.transforms import aslisp
 from efilter.transforms import hint
 from efilter.transforms import infer_type
 from efilter.transforms import normalize
@@ -47,6 +48,9 @@ class TransformCoverageTest(testlib.EfilterTestCase):
 
     def testAsDottyCoverage(self):
         self.assertASTCoverage(asdotty.asdotty)
+
+    def testAsLispCoverage(self):
+        self.assertASTCoverage(aslisp.aslisp)
 
     def testHintCoverage(self):
         self.assertASTCoverage(hint.hint)  # Nudge, nudge.

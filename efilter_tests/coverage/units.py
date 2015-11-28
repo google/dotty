@@ -21,6 +21,7 @@ EFILTER coverage tests for units
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter.transforms import asdotty
+from efilter.transforms import aslisp
 from efilter.transforms import hint
 from efilter.transforms import infer_type
 from efilter.transforms import normalize
@@ -28,6 +29,7 @@ from efilter.transforms import solve
 from efilter.transforms import validate
 
 from efilter_tests.unit.transforms import asdotty as asdotty_test
+from efilter_tests.unit.transforms import aslisp as aslisp_test
 from efilter_tests.unit.transforms import hint as hint_test
 from efilter_tests.unit.transforms import infer_type as infer_type_test
 from efilter_tests.unit.transforms import normalize as normalize_test
@@ -54,6 +56,9 @@ class UnitCoverageTest(testlib.EfilterTestCase):
 
     def testAsDottyCoverage(self):
         self.assertUnitCoverage(asdotty.asdotty, asdotty_test.AsDottyTest)
+
+    def testAsLispCoverage(self):
+        self.assertUnitCoverage(aslisp.aslisp, aslisp_test.AsLispTest)
 
     def testHintCoverage(self):
         self.assertUnitCoverage(hint.hint, hint_test.HintTest)
