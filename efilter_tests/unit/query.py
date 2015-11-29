@@ -26,7 +26,6 @@ from efilter import ast
 from efilter import query
 
 from efilter.transforms import normalize
-from efilter.transforms import hint
 
 
 class QueryTest(unittest.TestCase):
@@ -56,10 +55,6 @@ class QueryTest(unittest.TestCase):
         # Normalization shouldn't mess up the code (because it's 1:1).
         q = normalize.normalize(q)
         self.assertEqual(q.source, "Process.pid    != 10")
-
-        # Bigger changes will trigger new source, though.
-        q = hint.hint(q, selector="Process")
-        self.assertEqual(q.source, "pid != 10")
 
     def testLisp(self):
         """Should be able to make lisp queries and preserve syntax."""

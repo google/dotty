@@ -57,6 +57,6 @@ def aslisp(expr):
     return ("var", expr.value)
 
 
-@aslisp.implementation(for_type=query.Query)
+@aslisp.implementation(for_type=q.Query)
 def aslisp(query):
     return aslisp(query.root)

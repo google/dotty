@@ -24,7 +24,6 @@ from efilter import ast
 
 from efilter.transforms import asdotty
 from efilter.transforms import aslisp
-from efilter.transforms import hint
 from efilter.transforms import infer_type
 from efilter.transforms import normalize
 from efilter.transforms import solve
@@ -51,9 +50,6 @@ class TransformCoverageTest(testlib.EfilterTestCase):
 
     def testAsLispCoverage(self):
         self.assertASTCoverage(aslisp.aslisp)
-
-    def testHintCoverage(self):
-        self.assertASTCoverage(hint.hint)  # Nudge, nudge.
 
     def testInferTypeCoverage(self):
         self.assertASTCoverage(infer_type.infer_type)
