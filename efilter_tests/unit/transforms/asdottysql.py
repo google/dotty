@@ -163,3 +163,8 @@ class AsDottySQLTest(unittest.TestCase):
         self.assertOutput(
             original="[10, 15, 20 + 5]",
             output="[10, 15, 20 + 5]")
+    
+    def testIfElse(self):
+        self.assertOutput(
+            original="if foo then bar else if baz then brr else bzz",
+            output="if foo then bar else if baz then brr else bzz")

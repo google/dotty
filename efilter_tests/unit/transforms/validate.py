@@ -23,6 +23,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 from efilter_tests import mocks
 from efilter_tests import testlib
 
+from efilter import ast
 from efilter import errors
 from efilter import query
 
@@ -40,6 +41,22 @@ class ValidateTest(testlib.EfilterTestCase):
         self.assertTrue(validate.validate(q),
                         mocks.MockRootType)
 
+    def testIfElse(self):
+        # Missing else:
+        q = query.Query(
+            ast.IfElse(
+                ast.Pair(ast.Literal(True), ast.Literal("foo")),
+                ast.Pair(ast.Literal(True), ast.Literal("bar"))))
+
+        with self.assertRaises(errors.EfilterLogicError):
+            validate.validate(q)
+
+        # The validator technically also checks whether conditions evaluate
+        # to booleans, but everything in Python can be turned into a boolean
+        # the IBoolean falls through to the python bool implementation, so
+        # this is not really testable because there is no value that's not
+        # a boolean.
+
     def testComplement(self):
         # Numbers implement IBoolean so this should work.
         q = query.Query("not 5")
@@ -48,6 +65,7 @@ class ValidateTest(testlib.EfilterTestCase):
 
     def testBinaryExpression(self):
         q = query.Query("5.member")
+
         with self.assertRaises(errors.EfilterTypeError):
             validate.validate(q)
 

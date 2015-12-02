@@ -45,6 +45,7 @@ EXPRESSIONS = {
     "repeat": ast.Repeat,
     "tuple": ast.Tuple,
     "bind": ast.Bind,
+    "if": ast.IfElse,
     ":": ast.Pair,
     "|": ast.Union,
     "&": ast.Intersection,

@@ -53,6 +53,22 @@ def validate(expr, scope):
     return True
 
 
+@validate.implementation(for_type=ast.IfElse)
+def validate(expr, scope):
+    # Make sure there's an ELSE block.
+    if expr.default() is None:
+        raise errors.EfilterLogicError(
+            root=expr,
+            message="Else blocks are required in EFILTER.")
+
+    # Make sure conditions evaluate to IBoolean.
+    for condition, _ in expr.conditions():
+        t = infer_type.infer_type(condition, scope)
+        if not protocol.isa(t, boolean.IBoolean):
+            raise errors.EfilterTypeError(root=expr, actual=t,
+                                          expected=boolean.IBoolean)
+
+
 @validate.implementation(for_type=ast.Complement)
 def validate(expr, scope):
     t = infer_type.infer_type(expr.value, scope)

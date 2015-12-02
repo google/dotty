@@ -233,6 +233,10 @@ class Parser(syntax.Syntax):
         # and that might be confusing to the user.
         self.reject(grammar.sql_keyword)
 
+        # Match if-else before other things that consume symbols.
+        if self.accept(grammar.if_if):
+            return self.if_if()
+
         # Operators must be matched first because the same symbols could also
         # be vars or applications.
         if self.accept(grammar.prefix):
@@ -497,6 +501,29 @@ class Parser(syntax.Syntax):
                 start_token=keyword)
 
         return expr_type(*arguments, start=keyword_start, end=self.matched_end)
+
+    # If-else if-else grammar.
+    def if_if(self):
+        start = self.matched_start
+
+        # Even-numbered children are conditions; odd-numbered are results.
+        # Last child is the else expression.
+        children = [self.expression()]
+
+        self.expect(grammar.if_then)
+        children.append(self.expression())
+
+        while self.accept(grammar.if_else_if):
+            children.append(self.expression())
+            self.expect(grammar.if_then)
+            children.append(self.expression())
+
+        if self.accept(grammar.if_else):
+            children.append(self.expression())
+        else:
+            children.append(ast.Literal(None))
+
+        return ast.IfElse(*children, start=start, end=self.matched_end)
 
     # Function application subgrammar.
 

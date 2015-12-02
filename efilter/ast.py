@@ -119,6 +119,7 @@ class BinaryExpression(Expression):
 class VariadicExpression(Expression):
     """Represents an expression with variable arity."""
 
+    type_signature = protocol.AnyType
     arity = None
     __abstract = True
 
@@ -305,6 +306,31 @@ class Tuple(VariadicExpression):
     """Create a new tuple of values."""
     type_signature = protocol.AnyType
     return_signature = tuple
+
+
+### Conditionals ###
+
+class IfElse(VariadicExpression):
+    """Evaluates as if-else if-else if-else blocks.
+
+    Subexpressions are arranged as follows:
+
+    - Children with an even ordinal number (0, 2, 4...) are conditions and
+      must evaluate to an IBoolean.
+    - Children with an odd ordinal number (1, 3, 5...) are the block that will
+      be returned if the previous condition returned true.
+    - The last child is the else block.
+    """
+
+    def conditions(self):
+        """The if-else pairs."""
+        for idx in xrange(1, len(self.children), 2):
+            yield (self.children[idx - 1], self.children[idx])
+
+    def default(self):
+        """The else block."""
+        if len(self.children) % 2:
+            return self.children[-1]
 
 
 ### Logical Variadic ###

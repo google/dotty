@@ -292,6 +292,33 @@ class ParserTest(unittest.TestCase):
                        ast.Literal(2),
                        ast.Literal(3)))
 
+    def testIfElse(self):
+        self.assertQueryMatches(
+            "if true then 'foo'",
+            ast.IfElse(
+                ast.Literal(True), ast.Literal("foo"), ast.Literal(None)))
+
+        self.assertQueryMatches(
+            "if true then 'foo' else 'bar'",
+            ast.IfElse(
+                ast.Literal(True), ast.Literal("foo"), ast.Literal("bar")))
+
+        self.assertQueryMatches(
+            "if true then 'foo' else if 5 + 5 then 'bar' else 'baz'",
+            ast.IfElse(
+                ast.Literal(True),
+                ast.Literal("foo"),
+                ast.Sum(
+                    ast.Literal(5), ast.Literal(5)),
+                ast.Literal("bar"),
+                ast.Literal("baz")))
+
+        # Missing then blows up:
+        self.assertQueryRaises("if (true) bar")
+
+        # Colon blows up:
+        self.assertQueryRaises("if true: bar")
+
     def testBasicSelect(self):
         self.assertQueryMatches(
             "SELECT * FROM pslist()",

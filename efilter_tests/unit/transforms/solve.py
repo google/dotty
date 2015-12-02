@@ -106,6 +106,17 @@ class SolveTest(testlib.EfilterTestCase):
             solve.solve(query, {"x": 2, "y": {"foo": "bar"}}).value,
             (7, True, "bar"))
 
+    def testIfElse(self):
+        query = q.Query(("if", True, "foo", "bar"))
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            "foo")
+
+        query = q.Query(("if", False, "foo", False, "baz", "bar"))
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            "bar")
+
     def testPair(self):
         query = q.Query("x: y", syntax="dottysql")
         self.assertEqual(

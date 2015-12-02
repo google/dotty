@@ -309,6 +309,23 @@ def application(tokens):
         return TokenMatch(None, func.value, (func, paren))
 
 
+def if_if(tokens):
+    """Matches an if-else block."""
+    return _keyword(tokens, "if")
+
+
+def if_then(tokens):
+    return _keyword(tokens, "then")
+
+
+def if_else_if(tokens):
+    return _multi_keyword(tokens, ("else", "if"))
+
+
+def if_else(tokens):
+    return _keyword(tokens, "else")
+
+
 # SQL subgrammar:
 
 def select(tokens):

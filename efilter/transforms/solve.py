@@ -35,6 +35,7 @@ from efilter import query as q
 
 from efilter.protocols import applicative
 from efilter.protocols import associative
+from efilter.protocols import boolean
 from efilter.protocols import iset
 from efilter.protocols import reflective
 from efilter.protocols import repeated
@@ -205,6 +206,16 @@ def solve(expr, vars):
     """Build a tuple from subexpressions."""
     result = tuple(solve(x, vars).value for x in expr.children)
     return Result(result, (), ())
+
+
+@solve.implementation(for_type=ast.IfElse)
+def solve(expr, vars):
+    """Evaluate conditions and return the one that matches."""
+    for condition, result in expr.conditions():
+        if boolean.asbool(solve(condition, vars).value):
+            return solve(result, vars)
+
+    return solve(expr.default(), vars)
 
 
 @solve.implementation(for_type=ast.Map)

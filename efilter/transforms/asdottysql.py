@@ -216,6 +216,13 @@ def asdottysql(expr):
     return "[%s]" % ", ".join(asdottysql(x) for x in expr.children)
 
 
+@asdottysql.implementation(for_type=ast.IfElse)
+def asdottysql(expr):
+    branches = ["if %s then %s" % (asdottysql(c), asdottysql(v))
+                for c, v in expr.conditions()]
+    return "%s else %s" % (" else ".join(branches), asdottysql(expr.default()))
+
+
 @asdottysql.implementation(for_type=ast.Literal)
 def asdottysql(expr):
     return repr(expr.value)

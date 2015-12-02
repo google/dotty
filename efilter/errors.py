@@ -85,6 +85,10 @@ class EfilterError(Exception):
             type(self), self.message, self.start, self.end)
 
 
+class EfilterLogicError(EfilterError):
+    pass
+
+
 class EfilterNoneError(EfilterError):
     pass
 
