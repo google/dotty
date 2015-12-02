@@ -45,6 +45,7 @@ EXPRESSIONS = {
     "repeat": ast.Repeat,
     "tuple": ast.Tuple,
     "bind": ast.Bind,
+    ":": ast.Pair,
     "|": ast.Union,
     "&": ast.Intersection,
     ">": ast.StrictOrderedSet,

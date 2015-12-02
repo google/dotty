@@ -28,6 +28,25 @@ import functools
 import threading
 
 
+def memoize(func):
+    # Declare the class in this lexical scope so 'func' is bound to the
+    # decorated callable.
+    class memdict(dict):
+        """Calls 'func' for missing keys in this dict subclass."""
+
+        def __missing__(self, args):
+            result = func(*args)
+            self[args] = result
+            return result
+
+    cache = memdict()
+
+    def memoized(*args):
+        return cache[args]
+
+    return memoized
+
+
 def call_audit(func):
     """Print a detailed audit of all calls to this function."""
     def audited_func(*args, **kwargs):
@@ -313,7 +332,27 @@ class multimethod(object):
         finally:
             self._write_lock.release()
 
-    def implementation(self, for_type):
+    @staticmethod
+    def __get_types(for_type=None, for_types=None):
+        """Parse the arguments and return a tuple of types to implement for.
+
+        Raises:
+            ValueError or TypeError as appropriate.
+        """
+        if for_type:
+            if for_types:
+                raise ValueError("Cannot pass both for_type and for_types.")
+            for_types = (for_type,)
+        elif for_types:
+            if not isinstance(for_types, tuple):
+                raise TypeError("for_types must be passed as a tuple of "
+                                "types (classes).")
+        else:
+            raise ValueError("Must pass either for_type or for_types.")
+
+        return for_types
+
+    def implementation(self, for_type=None, for_types=None):
         """Return a decorator that will register the implementation.
 
         Example:
@@ -329,8 +368,10 @@ class multimethod(object):
             def add(x, y):
                 return int(x) + int(y)
         """
+        for_types = self.__get_types(for_type, for_types)
+
         def _decorator(implementation):
-            self.implement(implementation, for_type)
+            self.implement(implementation, for_types=for_types)
             return self
 
         return _decorator
@@ -348,16 +389,7 @@ class multimethod(object):
         Raises:
             ValueError
         """
-        if for_type:
-            if for_types:
-                raise ValueError("Cannot pass both for_type and for_types.")
-            for_types = (for_type,)
-        elif for_types:
-            if not isinstance(for_types, tuple):
-                raise TypeError("for_types must be passed as a tuple of "
-                                "types (classes).")
-        else:
-            raise ValueError("Must pass either for_type or for_types.")
+        for_types = self.__get_types(for_type, for_types)
 
         for t in for_types:
             self._write_lock.acquire()
