@@ -37,6 +37,19 @@ class ParserTest(unittest.TestCase):
         p = parser.Parser(query, params=params)
         self.assertRaises(errors.EfilterParseError, p.parse)
 
+    def testOperatorCaseSensitivity(self):
+        self.assertQueryMatches(
+            "1 AND 2",
+            ast.Intersection(
+                ast.Literal(1),
+                ast.Literal(2)))
+
+        self.assertQueryMatches(
+            "1 and 2",
+            ast.Intersection(
+                ast.Literal(1),
+                ast.Literal(2)))
+
     def testParams(self):
         self.assertQueryMatches(
             "? == 1 and ? == 2",

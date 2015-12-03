@@ -102,7 +102,7 @@ def _operator(tokens, operators):
         if len(operator_name) == 1:
             operator_name = operator_name[0]
 
-        operator = operators[operator_name]
+        operator = operators[operator_name.lower()]
         return match._replace(operator=operator)
 
 
