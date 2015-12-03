@@ -259,6 +259,10 @@ def prefix(tokens):
     return _operator(tokens, PREFIX)
 
 
+def param(tokens):
+    return _name(tokens, "param")
+
+
 def not_in(tokens):
     match = _multi_keyword(tokens, ("not", "in"))
     if match:

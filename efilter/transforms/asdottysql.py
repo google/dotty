@@ -220,7 +220,14 @@ def asdottysql(expr):
 def asdottysql(expr):
     branches = ["if %s then %s" % (asdottysql(c), asdottysql(v))
                 for c, v in expr.conditions()]
-    return "%s else %s" % (" else ".join(branches), asdottysql(expr.default()))
+
+    if_ = " else ".join(branches)
+
+    else_ = expr.default()
+    if not else_ or else_ == ast.Literal(None):
+        return if_
+
+    return "%s else %s" % (if_, asdottysql(else_))
 
 
 @asdottysql.implementation(for_type=ast.Literal)
@@ -231,6 +238,14 @@ def asdottysql(expr):
 @asdottysql.implementation(for_type=ast.Var)
 def asdottysql(expr):
     return expr.value
+
+
+# Unsupported AST.
+
+@asdottysql.implementation(for_type=ast.ContainmentOrder)
+def asdottysql(expr):
+    _ = expr
+    return "<Subexpression cannot be formatted as DottySQL.>"
 
 
 syntax.Syntax.register_formatter(shorthand="dottysql", formatter=asdottysql)

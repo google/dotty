@@ -74,6 +74,7 @@ class Parser(syntax.Syntax):
     """
 
     last_match = grammar.TokenMatch(None, None, None)
+    last_param = 0
 
     def __init__(self, original, params=None):
         super(Parser, self).__init__(original)
@@ -220,6 +221,10 @@ class Parser(syntax.Syntax):
                 | list
                 | "(" expression ")" ) .
         """
+        # Parameter replacement with literals.
+        if self.accept(grammar.param):
+            return self.param()
+
         # At the top level, we try to see if we are recursing into an SQL query.
         if self.accept(grammar.select):
             return self.select()
@@ -288,8 +293,30 @@ class Parser(syntax.Syntax):
         if self.accept(grammar.lbracket):
             return self.list()
 
-        return self.error("Don't know how to parse next.",
-                          start_token=self.lexer.peek())
+        return self.error(
+            "Was not expecting %r here." % self.lexer.peek(0).name,
+            start_token=self.lexer.peek(0))
+
+    def param(self):
+        if self.matched_value is None:
+            param = self.last_param
+            self.last_param += 1
+        elif isinstance(self.matched_value, int):
+            param = self.last_param = self.matched_value
+        elif isinstance(self.matched_value, basestring):
+            param = self.matched_value
+        else:
+            return self.error(
+                "Invalid param %r." % self.matched_value,
+                start_token=self.matched_tokens[0])
+
+        if param not in self.params:
+            return self.error(
+                "Param %r unavailable. (Available: %r)" % (param, self.params),
+                start_token=self.matched_tokens[0])
+
+        return ast.Literal(self.params[param], start=self.matched_start,
+                           end=self.matched_end)
 
     def accept_operator(self, precedence):
         """Accept the next binary operator only if it's of higher precedence."""

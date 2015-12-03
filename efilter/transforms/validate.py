@@ -102,6 +102,8 @@ def validate(expr, scope):
 @validate.implementation(for_type=ast.VariadicExpression)
 def validate(expr, scope):
     for subexpr in expr.children:
+        validate(subexpr, scope)
+
         t = infer_type.infer_type(subexpr, scope)
         if not (t is protocol.AnyType
                 or protocol.isa(t, expr.type_signature)):

@@ -163,8 +163,16 @@ class AsDottySQLTest(unittest.TestCase):
         self.assertOutput(
             original="[10, 15, 20 + 5]",
             output="[10, 15, 20 + 5]")
-    
+
     def testIfElse(self):
         self.assertOutput(
             original="if foo then bar else if baz then brr else bzz",
             output="if foo then bar else if baz then brr else bzz")
+
+        self.assertOutput(
+            original="if foo then bar",
+            output="if foo then bar")
+
+    def testContainmentOrder(self):
+        """Doesn't do anything."""
+        pass

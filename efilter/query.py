@@ -30,7 +30,7 @@ def guess_source_syntax(source):
         return "expression"
 
     if isinstance(source, basestring):
-        return "dotty"
+        return "dottysql"
 
     if isinstance(source, tuple):
         return "lisp"
@@ -97,13 +97,13 @@ class Query(object):
             # Run formatter to generate the source.
             if not self.syntax:
                 # Good, fully expressive default.
-                self.syntax = "dotty"
+                self.syntax = "dottysql"
 
             formatter = s.Syntax.get_formatter(self.syntax)
             if not formatter:
                 # If we don't have a formatter for the explicit syntax, just
                 # generate at least /something/.
-                formatter = s.Syntax.get_formatter("dotty")
+                formatter = s.Syntax.get_formatter("dottysql")
             self.source = formatter(self.root)
 
     def __str__(self):

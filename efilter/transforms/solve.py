@@ -109,7 +109,9 @@ def solve(expr, vars):
                 root=expr,
                 message="Trying to access member %r of a null." % expr.value)
         else:
-            raise
+            raise errors.EfilterTypeError(
+                root=expr,
+                message="%r (vars: %r)" % (e, vars))
     except NotImplementedError as e:
         raise errors.EfilterError(
             root=expr,
@@ -120,11 +122,12 @@ def solve(expr, vars):
 @solve.implementation(for_type=ast.Select)
 def solve(expr, vars):
     """Use IAssociative.select to get key (rhs) from the data (lhs)."""
-    data = solve(expr.lhs, vars).value
+    data = __within_lhs_as_repeated(expr.lhs, vars)
     key = solve(expr.rhs, vars).value
 
     try:
-        result = associative.select(data, key)
+        results = [associative.select(d, key) for d in repeated.getvalues(data)]
+        result = repeated.meld(*results)
     except (KeyError, AttributeError) as e:
         # Raise a better exception for accessing a non-existent member.
         raise errors.EfilterKeyError(root=expr, key=expr.value, message=e)
@@ -218,6 +221,22 @@ def solve(expr, vars):
     return solve(expr.default(), vars)
 
 
+def __within_lhs_as_repeated(lhs_expr, vars):
+    """Map/Filter/others support lists and IRepeated on the LHS.
+
+    If the value of 'lhs_expr' is a list or tuple of IAssociative objects then
+    treat it as an IRepeated of IAssociative objects because that is what the
+    caller meant to do. This is a convenience so that users don't have to
+    create IRepeated objects.
+    """
+    var = solve(lhs_expr, vars).value
+    if (var and isinstance(var, (tuple, list))
+            and protocol.implements(var[0], associative.IAssociative)):
+        return repeated.meld(*var)
+
+    return var
+
+
 @solve.implementation(for_type=ast.Map)
 def solve(expr, vars):
     """Solves the map-form, by recursively calling its RHS with new vars.
@@ -233,11 +252,11 @@ def solve(expr, vars):
     evaluate to {"name": "Bob"}, which subdict will then be used on the RHS as
     new vars, and that whole form will evaluate to "Bob".
     """
-    lhs = solve(expr.lhs, vars)
+    var = __within_lhs_as_repeated(expr.lhs, vars)
 
     try:
         values = []
-        for value in repeated.getvalues(lhs.value):
+        for value in repeated.getvalues(var):
             value_ = solve(expr.rhs, value)
             values.append(value_.value)
     except errors.EfilterNoneError as error:
@@ -253,10 +272,10 @@ def solve(expr, vars):
 
     Returns any LHS values for which RHS evaluates to a true value.
     """
-    lhs = solve(expr.lhs, vars)
+    var = __within_lhs_as_repeated(expr.lhs, vars)
 
     results = []
-    for value in repeated.getvalues(lhs.value):
+    for value in repeated.getvalues(var):
         if solve(expr.rhs, value).value:
             results.append(value)
 
@@ -266,7 +285,7 @@ def solve(expr, vars):
 @solve.implementation(for_type=ast.Sort)
 def sort(expr, vars):
     """Sort values on the LHS by the value they yield when passed to RHS."""
-    values = repeated.getvalues(solve(expr.lhs, vars).value)
+    values = repeated.getvalues(__within_lhs_as_repeated(expr.lhs, vars))
     values = sorted(values, key=lambda val: solve(expr.rhs, val))
     return Result(repeated.meld(*values), (), ())
 
@@ -281,7 +300,7 @@ def solve(expr, vars):
     IAssociative objects then RHS will be evaluated with each state and True
     will be returned only if each result is true.
     """
-    branch_vars = solve(expr.lhs, vars).value
+    branch_vars = __within_lhs_as_repeated(expr.lhs, vars)
     for state in repeated.getvalues(branch_vars):
         result = solve(expr.rhs, state)
         if not result.value:
@@ -293,7 +312,7 @@ def solve(expr, vars):
 @solve.implementation(for_type=ast.Any)
 def solve(expr, vars):
     """Same as Each, except returning True on first true result at LHS."""
-    branch_vars = solve(expr.lhs, vars).value
+    branch_vars = __within_lhs_as_repeated(expr.lhs, vars)
     result = Result(False, (), ())
     for state in repeated.getvalues(branch_vars):
         result = solve(expr.rhs, state)
@@ -347,6 +366,9 @@ def solve(expr, vars):
     for child in expr.children:
         result = solve(child, vars)
         if result.value:
+            # Don't replace a matched child branch.
+            if result.branch:
+                return result
             return result._replace(branch=child)
 
     return Result(False, (), ())

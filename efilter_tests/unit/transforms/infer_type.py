@@ -150,21 +150,21 @@ class InferTypeTest(testlib.EfilterTestCase):
     def testFilter(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("find Process where (parent.pid == 10)"),
+                q.Query("select * from Process where (parent.pid == 10)"),
                 mocks.MockRootType),
             mocks.Process)
 
     def testSort(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("sort Process where (parent.pid)"),
+                q.Query("select * from Process order by parent.pid"),
                 mocks.MockRootType),
             mocks.Process)
 
     def testMap(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("Process.parent where (pid + 10)"),
+                q.Query("Process.parent.pid + 10"),
                 mocks.MockRootType),
             number.INumber)
 

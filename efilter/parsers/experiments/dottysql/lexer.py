@@ -253,6 +253,8 @@ class Lexer(object):
         if not param_name or param_name == "?":
             param_name = self._param_idx
             self._param_idx += 1
+        elif param_name and re.match(r"^\d+$", param_name):
+            param_name = int(param_name)
 
         return Token(name=pattern.name, value=param_name, start=match.start(),
                      end=match.end())

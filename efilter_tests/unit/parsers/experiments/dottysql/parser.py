@@ -37,6 +37,40 @@ class ParserTest(unittest.TestCase):
         p = parser.Parser(query, params=params)
         self.assertRaises(errors.EfilterParseError, p.parse)
 
+    def testParams(self):
+        self.assertQueryMatches(
+            "? == 1 and ? == 2",
+            ast.Intersection(
+                ast.Equivalence(
+                    ast.Literal(1),
+                    ast.Literal(1)),
+                ast.Equivalence(
+                    ast.Literal(2),
+                    ast.Literal(2))),
+            params=[1, 2])
+
+        self.assertQueryMatches(
+            "{1} == 1 and {0} == 2",
+            ast.Intersection(
+                ast.Equivalence(
+                    ast.Literal(2),
+                    ast.Literal(1)),
+                ast.Equivalence(
+                    ast.Literal(1),
+                    ast.Literal(2))),
+            params=[1, 2])
+
+        self.assertQueryMatches(
+            "{bar} == 1 and {foo} == 2",
+            ast.Intersection(
+                ast.Equivalence(
+                    ast.Literal("foo"),
+                    ast.Literal(1)),
+                ast.Equivalence(
+                    ast.Literal(1),
+                    ast.Literal(2))),
+            params=dict(bar="foo", foo=1))
+
     def testLiterals(self):
         # Numbers:
         self.assertQueryMatches("5", ast.Literal(5))

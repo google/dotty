@@ -148,7 +148,7 @@ class SolveTest(testlib.EfilterTestCase):
     def testEach(self):
         self.assertEqual(
             solve.solve(
-                q.Query("each Process.parent where (pid == 1)"),
+                q.Query("each(Process.parent, (pid == 1))"),
                 {"Process": {"parent": superposition.superposition(
                     mocks.Process(1, None, None),
                     mocks.Process(2, None, None))}}).value,
@@ -166,7 +166,7 @@ class SolveTest(testlib.EfilterTestCase):
     def testSort(self):
         self.assertEqual(
             solve.solve(
-                q.Query("sort Process where pid"),
+                q.Query("select * from Process order by pid"),
                 {"Process": repeated.meld(
                     mocks.Process(2, None, None),
                     mocks.Process(1, None, None))}).value,
@@ -178,7 +178,7 @@ class SolveTest(testlib.EfilterTestCase):
         # children and return those.
         self.assertEqual(
             solve.solve(
-                q.Query("Process.(sort children where pid)"),
+                q.Query("select * from Process.children order by pid"),
                 {"Process": {"children": repeated.meld(
                     mocks.Process(2, None, None),
                     mocks.Process(1, None, None))}}).value,
@@ -189,7 +189,7 @@ class SolveTest(testlib.EfilterTestCase):
     def testFilter(self):
         self.assertEqual(
             solve.solve(
-                q.Query("find Process where (pid == 1)"),
+                q.Query("select * from Process where (pid == 1)"),
                 {"Process": repeated.meld(
                     mocks.Process(2, None, None),
                     mocks.Process(1, None, None))}).value,
@@ -261,7 +261,7 @@ class SolveTest(testlib.EfilterTestCase):
     def testMembership(self):
         self.assertEqual(
             solve.solve(
-                q.Query("pid in (1, 2)"),
+                q.Query("pid in [1, 2]"),
                 mocks.Process(1, None, None)).value,
             True)
 
