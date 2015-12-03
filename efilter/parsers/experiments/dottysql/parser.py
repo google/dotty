@@ -464,8 +464,11 @@ class Parser(syntax.Syntax):
             if self.accept(grammar.select_from):
                 # Make ast.Bind here.
                 source_expression = self.select_from()
-                return ast.Map(source_expression, ast.Bind(*vars),
-                               start=start, end=self.matched_end)
+                return ast.Map(
+                    source_expression,
+                    ast.Bind(*vars, start=start, end=vars[-1].end),
+                    start=start,
+                    end=self.matched_end)
 
             self.expect(grammar.comma)
 
@@ -480,18 +483,22 @@ class Parser(syntax.Syntax):
         return source_expression
 
     def select_where(self, source_expression):
-        filter_expression = ast.Filter(source_expression, self.expression())
+        start = self.matched_start
+        filter_expression = ast.Filter(source_expression, self.expression(),
+                                       start=start, end=self.matched_end)
+
         if self.accept(grammar.select_order):
             return self.select_order(filter_expression)
 
         return filter_expression
 
     def select_order(self, source_expression):
+        start = self.matched_start
         sort_expression = ast.Sort(source_expression, self.expression(),
-                                   start=self.matched_start,
-                                   end=self.matched_end)
+                                   start=start, end=self.matched_end)
 
         if self.accept(grammar.select_asc):
+            sort_expression.end = self.matched_end
             return sort_expression
 
         if self.accept(grammar.select_desc):

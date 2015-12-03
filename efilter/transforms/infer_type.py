@@ -71,13 +71,10 @@ def infer_type(expr, scope):
 
 @infer_type.implementation(for_type=ast.Var)
 def infer_type(expr, scope):
-    if scope and protocol.isa(scope, reflective.IReflective):
-        result = reflective.reflect(scope, expr.value)
-
-        if result:
-            return result
-
-    return protocol.AnyType
+    try:
+        return reflective.reflect(scope, expr.value) or protocol.AnyType
+    except NotImplementedError:
+        return protocol.AnyType
 
 
 @infer_type.implementation(for_type=ast.Complement)
@@ -119,12 +116,10 @@ def infer_type(expr, scope):
 
     container_type = infer_type(expr.value, scope)
 
-    if protocol.isa(container_type, reflective.IReflective):
-        t = reflective.reflect(container_type, key)
-        if t:
-            return t
-
-    return protocol.AnyType
+    try:
+        return reflective.reflect(container_type, key) or protocol.AnyType
+    except NotImplementedError:
+        return protocol.AnyType
 
 
 @infer_type.implementation(for_type=ast.VariadicExpression)
@@ -136,12 +131,11 @@ def infer_type(expr, scope):
 @infer_type.implementation(for_type=ast.Apply)
 def infer_type(expr, scope):
     func_type = infer_type(expr.func, scope)
-    if protocol.isa(func_type, applicative.IApplicative):
-        t = applicative.reflect_return(func_type)
-        if t:
-            return t
 
-    return protocol.AnyType
+    try:
+        return applicative.reflect_return(func_type) or protocol.AnyType
+    except NotImplementedError:
+        return protocol.AnyType
 
 
 @infer_type.implementation(for_type=ast.Repeat)
