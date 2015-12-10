@@ -231,7 +231,8 @@ BUILTINS = {
     "filter": ast.Filter,
     "bind": ast.Bind,
     "any": ast.Any,
-    "each": ast.Each
+    "each": ast.Each,
+    "reverse": ast.Reverse,
 }
 
 

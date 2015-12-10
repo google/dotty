@@ -84,8 +84,13 @@ class Parser(syntax.Syntax):
             self.params = {}
             for idx, val in enumerate(params):
                 self.params[idx] = val
-        else:
+        elif isinstance(params, dict):
             self.params = params
+        elif params is None:
+            self.params = {}
+        else:
+            raise TypeError("Params must be a list or a dict, not %r." %
+                            type(params))
 
     def parse(self):
         # If we get any exceptions, make sure they have access to the query

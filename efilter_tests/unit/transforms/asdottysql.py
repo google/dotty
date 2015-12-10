@@ -114,7 +114,7 @@ class AsDottySQLTest(unittest.TestCase):
     def testPair(self):
         self.assertOutput(
             original=(":", "x", ("+", 5, 5)),
-            output="'x': 5 + 5")
+            output="'x': (5 + 5)")
 
     def testIsInstance(self):
         self.assertOutput(

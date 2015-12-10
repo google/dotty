@@ -62,6 +62,18 @@ class EfilterError(Exception):
         return self.message
 
     @property
+    def adjusted_start(self):
+        """Start of the error in self.source (with the >>> and <<< delims)."""
+        if self.start is not None:
+            return self.start
+
+    @property
+    def adjusted_end(self):
+        """End of the error in self.source (with the >>> and <<< delims)."""
+        if self.end is not None:
+            return self.end + 9
+
+    @property
     def source(self):
         if not self.query:
             return None

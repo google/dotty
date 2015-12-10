@@ -348,6 +348,11 @@ class Union(LogicalOperation):
 class Intersection(LogicalOperation):
     """Logical AND (variadic)."""
 
+    # Subtle difference - this is /actually/ required to be a bool, as opposed
+    # to a Union, where the return signature is only required to support
+    # the boolean protocol.
+    return_signature = bool
+
 
 ### Variadic Relations ###
 

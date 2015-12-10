@@ -304,7 +304,8 @@ def solve(expr, vars):
     for state in repeated.getvalues(branch_vars):
         result = solve(expr.rhs, state)
         if not result.value:
-            return result
+            # Each is required to return an actual boolean.
+            return result._replace(value=False)
 
     return Result(True, (), ())
 
@@ -317,7 +318,8 @@ def solve(expr, vars):
     for state in repeated.getvalues(branch_vars):
         result = solve(expr.rhs, state)
         if result.value:
-            return result
+            # Any is required to return an actual boolean.
+            return result._replace(value=True)
 
     return result
 
@@ -350,15 +352,10 @@ def solve(expr, vars):
     for child in expr.children:
         result = solve(child, vars)
         if not result.value:
-            return result
+            # Intersections don't preserve the last value the way Unions do.
+            return result._replace(value=False)
 
     return result
-
-
-@solve.implementation(for_type=ast.Pair)
-def solve(expr, vars):
-    return Result((solve(expr.lhs, vars).value, solve(expr.rhs, vars).value),
-                  (), ())
 
 
 @solve.implementation(for_type=ast.Union)
@@ -366,12 +363,20 @@ def solve(expr, vars):
     for child in expr.children:
         result = solve(child, vars)
         if result.value:
-            # Don't replace a matched child branch.
+            # Don't replace a matched child branch. Also, preserve the actual
+            # value of the last subexpression (as opposed to just returning a
+            # boolean).
             if result.branch:
                 return result
             return result._replace(branch=child)
 
     return Result(False, (), ())
+
+
+@solve.implementation(for_type=ast.Pair)
+def solve(expr, vars):
+    return Result((solve(expr.lhs, vars).value, solve(expr.rhs, vars).value),
+                  (), ())
 
 
 @solve.implementation(for_type=ast.Sum)

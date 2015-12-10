@@ -127,19 +127,19 @@ def asdottysql(expr):
     return separator.join(children)
 
 
-def _format_binary(lhs, rhs, operator):
+def _format_binary(lhs, rhs, operator, lspace=" ", rspace=" "):
     left = asdottysql(lhs)
     right = asdottysql(rhs)
 
     lhs_precedence = __expression_precedence(lhs)
-    if lhs_precedence is not None and lhs_precedence < operator.precedence:
+    if lhs_precedence is not None and lhs_precedence <= operator.precedence:
         left = "(%s)" % left
 
     rhs_precedence = __expression_precedence(rhs)
-    if rhs_precedence is not None and rhs_precedence < operator.precedence:
+    if rhs_precedence is not None and rhs_precedence <= operator.precedence:
         right = "(%s)" % right
 
-    return "%s %s %s" % (left, operator.name, right)
+    return "".join((left, lspace, operator.name, rspace, right))
 
 
 @asdottysql.implementation(for_type=ast.Complement)
@@ -175,7 +175,7 @@ def asdottysql(expr):
 
 @asdottysql.implementation(for_type=ast.Pair)
 def asdottysql(expr):
-    return "%s: %s" % (asdottysql(expr.lhs), asdottysql(expr.rhs))
+    return _format_binary(expr.lhs, expr.rhs, grammar.INFIX[":"], lspace="")
 
 
 @asdottysql.implementation(for_types=(ast.IsInstance, ast.RegexFilter,
