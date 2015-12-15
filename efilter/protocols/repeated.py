@@ -121,7 +121,7 @@ def isrepeating(x):
 
 
 class IRepeated(protocol.Protocol):
-    _protocol_functions = (getvalues, value_type, value_eq, value_apply)
+    _required_functions = (getvalues, value_type, value_eq, value_apply)
 
 
 def _scalar_value_eq(x, y):

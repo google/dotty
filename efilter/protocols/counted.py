@@ -31,7 +31,7 @@ def count(coll):
 
 
 class ICounted(protocol.Protocol):
-    _protocol_functions = (count,)
+    _required_functions = (count,)
 
 
 # Default implementations:

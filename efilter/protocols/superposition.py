@@ -174,7 +174,7 @@ def insuperposition(x):
 
 
 class ISuperposition(protocol.Protocol):
-    _protocol_functions = (getstates, state_type, state_union,
+    _required_functions = (getstates, state_type, state_union,
                            state_intersection, state_difference, hasstate,
                            state_eq, state_superset, state_apply)
 

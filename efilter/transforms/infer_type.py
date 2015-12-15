@@ -20,15 +20,19 @@ EFILTER query type inference.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+from efilter import ast
 from efilter import dispatch
 from efilter import errors
-from efilter import ast
 from efilter import protocol
 from efilter import query as q
+from efilter import scope as s
+
+from efilter.stdlib import core as std_core
 
 from efilter.protocols import applicative
+from efilter.protocols import associative
 from efilter.protocols import boolean
-from efilter.protocols import reflective
+from efilter.protocols import structured
 
 
 @dispatch.multimethod
@@ -45,7 +49,7 @@ def infer_type(expr, scope=None):
 
     Arguments:
         expr: The expression or query to infer return type of.
-        scope (OPTIONAL): A type that implements IReflective.
+        scope (OPTIONAL): An instance of ScopeStack.
 
     Returns:
         A type, if known. On failure or in undecidable cases, returns AnyType.
@@ -71,26 +75,15 @@ def infer_type(expr, scope):
 
 @infer_type.implementation(for_type=ast.Var)
 def infer_type(expr, scope):
-    try:
-        return reflective.reflect(scope, expr.value) or protocol.AnyType
-    except NotImplementedError:
-        return protocol.AnyType
+    if not isinstance(scope, s.ScopeStack):
+        scope = s.ScopeStack(scope)
+
+    return scope.reflect(expr.value) or protocol.AnyType
 
 
 @infer_type.implementation(for_type=ast.Complement)
 def infer_type(expr, scope):
-    t = infer_type(expr.value, scope)
-    if not protocol.isa(t, boolean.IBoolean):
-        raise errors.EfilterTypeError(root=expr,
-                                      actual=t,
-                                      expected=boolean.IBoolean)
-
     return bool
-
-
-@infer_type.implementation(for_type=ast.Reverse)
-def infer_type(expr, scope):
-    return infer_type(expr.value, scope)
 
 
 @infer_type.implementation(for_type=ast.IsInstance)
@@ -117,7 +110,28 @@ def infer_type(expr, scope):
     container_type = infer_type(expr.value, scope)
 
     try:
-        return reflective.reflect(container_type, key) or protocol.AnyType
+        # Associative types are not subject to scoping rules so we can just
+        # reflect using IAssociative.
+        return associative.reflect(container_type, key) or protocol.AnyType
+    except NotImplementedError:
+        return protocol.AnyType
+
+
+@infer_type.implementation(for_type=ast.Resolve)
+def infer_type(expr, scope):
+    """Try to infer the type of x.y if y is a known value (literal)."""
+    # Do we know what the member is?
+    if isinstance(expr.member, ast.Literal):
+        member = expr.member.value
+    else:
+        return protocol.AnyType
+
+    container_type = infer_type(expr.obj, scope)
+
+    try:
+        # We are not using lexical scope here on purpose - we want to see what
+        # the type of the member is only on the container_type.
+        return structured.reflect(container_type, member) or protocol.AnyType
     except NotImplementedError:
         return protocol.AnyType
 
@@ -147,7 +161,7 @@ def infer_type(expr, scope):
 @infer_type.implementation(for_type=ast.Map)
 def infer_type(expr, scope):
     t = infer_type(expr.context, scope)
-    return infer_type(expr.expression, t)
+    return infer_type(expr.expression, s.ScopeStack(scope, t))
 
 
 @infer_type.implementation(for_type=ast.Filter)

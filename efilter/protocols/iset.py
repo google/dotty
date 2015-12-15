@@ -68,7 +68,7 @@ def contains(s, e):
 
 
 class ISet(protocol.Protocol):
-    _protocol_functions = (union, intersection, difference, issuperset,
+    _required_functions = (union, intersection, difference, issuperset,
                            contains)
 
 

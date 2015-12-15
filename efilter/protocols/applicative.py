@@ -18,31 +18,11 @@
 
 """EFILTER abstract type system."""
 
-import abc
-import itertools
-
 from efilter import dispatch
 from efilter import protocol
 
 # Declarations:
 # pylint: disable=unused-argument
-
-
-class AbstractPythonCallable(object):
-    """Abstract base class for anything that implements __call__."""
-
-    __metaclass__ = abc.ABCMeta
-
-    @classmethod
-    def __subclasshook__(cls, C):
-        # Let's not create an inheritance cycle.
-        if C is IApplicative:
-            return NotImplemented
-
-        if callable(C):
-            return True
-
-        return NotImplemented
 
 
 @dispatch.multimethod
@@ -54,30 +34,41 @@ def apply(applicative, args, kwargs):
     raise NotImplementedError()
 
 
-@dispatch.class_multimethod
-def reflect_args(applicative):
-    """Return an iterable with types of arguments that 'applicative' takes."""
-    raise NotImplementedError()
-
-
-@dispatch.class_multimethod
 def reflect_return(applicative):
-    """Return the return type of 'applicative'."""
+    if isinstance(applicative, type):
+        return reflect_static_return(applicative)
+
+    return reflect_runtime_return(applicative)
+
+
+def reflect_args(applicative):
+    if isinstance(applicative, type):
+        return reflect_static_args(applicative)
+
+    return reflect_runtime_args(applicative)
+
+
+@dispatch.class_multimethod
+def reflect_static_args(applicative_cls):
     raise NotImplementedError()
+
+
+@dispatch.multimethod
+def reflect_runtime_args(applicative):
+    return reflect_static_args(type(applicative))
+
+
+@dispatch.class_multimethod
+def reflect_static_return(applicative_cls):
+    raise NotImplementedError()
+
+
+@dispatch.multimethod
+def reflect_runtime_return(applicative):
+    return reflect_static_return(type(applicative))
 
 
 class IApplicative(protocol.Protocol):
-    _protocol_functions = (apply, reflect_args, reflect_return)
-
-
-IApplicative.implement(
-    for_type=AbstractPythonCallable,
-    implementations={
-        apply: lambda a, args, kwargs: a(*args, **kwargs),
-
-        # I thought about what the default implementation should look like for
-        # Python functions and I realized this is actually literally as much
-        # guarantee as the language provides.
-        reflect_args: lambda _: itertools.repeat(protocol.AnyType),
-        reflect_return: lambda _: protocol.AnyType
-    })
+    _required_functions = (apply,)
+    _optional_functions = (reflect_static_return, reflect_runtime_return,
+                           reflect_static_args, reflect_runtime_args)

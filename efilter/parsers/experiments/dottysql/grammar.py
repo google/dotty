@@ -186,8 +186,8 @@ INFIX = collections.OrderedDict([
     (":", Operator(name=":", precedence=10, assoc="left", handler=ast.Pair,
                    docstring="Key/value pair.", postfix=None)),
     (".", Operator(name=".", precedence=12, assoc="left",
-                   handler=ast.Map,
-                   docstring="LHS.(EXPR) -> evaluate EXPR with LHS as vars.",
+                   handler=ast.Resolve,
+                   docstring="OBJ.MEMBER -> return MEMBER of OBJ.",
                    postfix=None)),
 ])
 
@@ -231,8 +231,7 @@ BUILTINS = {
     "filter": ast.Filter,
     "bind": ast.Bind,
     "any": ast.Any,
-    "each": ast.Each,
-    "reverse": ast.Reverse,
+    "each": ast.Each
 }
 
 

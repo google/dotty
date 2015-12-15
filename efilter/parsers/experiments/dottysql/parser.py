@@ -362,6 +362,9 @@ class Parser(syntax.Syntax):
                 rhs = self.expression()
                 self.expect(operator.postfix)
                 rhs.end = self.matched_end
+            elif operator == grammar.INFIX["."]:
+                # The dot operator changes the meaning of RHS.
+                rhs = self.dot_rhs()
             else:
                 # The right hand side is an atom, which might turn out to be
                 # an expression. Isn't recursion exciting?
@@ -381,6 +384,16 @@ class Parser(syntax.Syntax):
             lhs = operator.handler(lhs, rhs, start=lhs.start, end=rhs.end)
 
         return lhs
+
+    def dot_rhs(self):
+        """Match the right-hand side of a dot (.) operator.
+
+        The RHS must be a symbol token, but it is interpreted as a literal
+        string (because that's what goes in the AST of Resolve.)
+        """
+        self.expect(grammar.symbol)
+        return ast.Literal(self.matched_value, start=self.matched_start,
+                           end=self.matched_end)
 
     # SQL subgrammar:
 
@@ -425,8 +438,10 @@ class Parser(syntax.Syntax):
         if isinstance(expr, ast.Var):
             return expr.value
 
-        if isinstance(expr, ast.Map):
-            return self._guess_name_of(expr.rhs)
+        if isinstance(expr, ast.Resolve):
+            # We know the RHS of resolve is a Literal because that's what
+            # Parser.dot_rhs does.
+            return expr.rhs.value
 
     def select_what(self):
         # Each value we select is in form EXPRESSION [AS SYMBOL]. Values are
@@ -507,9 +522,13 @@ class Parser(syntax.Syntax):
             return sort_expression
 
         if self.accept(grammar.select_desc):
-            return ast.Reverse(sort_expression,
-                               start=sort_expression.start,
-                               end=self.matched_end)
+            return ast.Apply(
+                ast.Var("reverse",
+                        start=sort_expression.start,
+                        end=self.matched_end),
+                sort_expression,
+                start=sort_expression.start,
+                end=self.matched_end)
 
         return sort_expression
 

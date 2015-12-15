@@ -109,7 +109,7 @@ getkeys = dispatch.multimethod(getkeys,
 
 
 class IReflective(protocol.Protocol):
-    _protocol_functions = (reflect, getkeys)
+    _required_functions = (reflect, getkeys)
 
 
 IReflective.implement(for_type=dict,

@@ -27,24 +27,24 @@ from efilter import api
 
 class QueryTest(unittest.TestCase):
     def testApply(self):
-        self.assertSequenceEqual(
+        self.assertEqual(
             api.apply("select age from data where name == 'Peter'",
                       data=[dict(name="Peter", age=20),
                             dict(name="Paul", age=30)]),
-            [dict(age=20)])
+            dict(age=20))
 
-        self.assertSequenceEqual(
+        self.assertEqual(
             api.apply("select * from data where name == 'Peter'",
                       data=[dict(name="Peter", age=20),
                             dict(name="Paul", age=30)]),
-            [dict(age=20, name="Peter")])
+            dict(age=20, name="Peter"))
 
-        self.assertSequenceEqual(
+        self.assertEqual(
             api.apply("select * from data where name == ?",
                       data=[dict(name="Peter", age=20),
                             dict(name="Paul", age=30)],
                       replacements=["Peter"]),
-            [dict(age=20, name="Peter")])
+            dict(age=20, name="Peter"))
 
     def testSearch(self):
         self.assertSequenceEqual(

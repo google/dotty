@@ -31,7 +31,7 @@ def asbool(x):
 
 
 class IBoolean(protocol.Protocol):
-    _protocol_functions = (asbool,)
+    _required_functions = (asbool,)
 
 
 # Default implementations:

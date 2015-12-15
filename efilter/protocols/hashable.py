@@ -34,7 +34,7 @@ def hashed(x):
 
 
 class IHashable(protocol.Protocol):
-    _protocol_functions = (hashed,)
+    _required_functions = (hashed,)
 
 
 # Default implementations:

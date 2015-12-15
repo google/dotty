@@ -71,7 +71,9 @@ BUILTINS = dict((v, k) for k, v in grammar.BUILTINS.iteritems())
 def __expression_precedence(expr):
     operator = operators().get(type(expr))
     if operator:
-        return operator.precedence
+        return operator.precedence, operator.assoc
+
+    return None, None
 
 
 @dispatch.multimethod
@@ -117,7 +119,8 @@ def asdottysql(expr):
     children = []
 
     for child in expr.children:
-        precedence = __expression_precedence(child)
+        precedence, _ = __expression_precedence(child)
+
         if precedence is not None and precedence < operator.precedence:
             children.append("(%s)" % asdottysql(child))
         else:
@@ -131,12 +134,18 @@ def _format_binary(lhs, rhs, operator, lspace=" ", rspace=" "):
     left = asdottysql(lhs)
     right = asdottysql(rhs)
 
-    lhs_precedence = __expression_precedence(lhs)
-    if lhs_precedence is not None and lhs_precedence <= operator.precedence:
+    lhs_precedence, lassoc = __expression_precedence(lhs)
+    if lassoc == "left" and lhs_precedence is not None:
+        lhs_precedence += 1
+
+    if lhs_precedence is not None and lhs_precedence < operator.precedence:
         left = "(%s)" % left
 
-    rhs_precedence = __expression_precedence(rhs)
-    if rhs_precedence is not None and rhs_precedence <= operator.precedence:
+    rhs_precedence, rassoc = __expression_precedence(rhs)
+    if rassoc == "right" and rhs_precedence is not None:
+        rhs_precedence += 1
+
+    if rhs_precedence is not None and rhs_precedence < operator.precedence:
         right = "(%s)" % right
 
     return "".join((left, lspace, operator.name, rspace, right))
@@ -155,17 +164,16 @@ def asdottysql(expr):
                               expr.value.children[1],
                               grammar.INFIX["not in"])
 
-    child_precedence = __expression_precedence(expr.value)
+    child_precedence, assoc = __expression_precedence(expr.value)
+
+    if assoc == "left" and child_precedence:
+        child_precedence += 1
+
     if (child_precedence is not None
             and child_precedence < __expression_precedence(expr)):
         return "not (%s)" % asdottysql(expr.value)
 
     return "not %s" % asdottysql(expr.value)
-
-
-@asdottysql.implementation(for_type=ast.Reverse)
-def asdottysql(expr):
-    return "reverse(%s)" % asdottysql(expr.value)
 
 
 @asdottysql.implementation(for_type=ast.Bind)
@@ -204,6 +212,15 @@ def asdottysql(expr):
 
     return "%s[%s]" % (source,
                        ", ".join([asdottysql(arg) for arg in arguments]))
+
+
+@asdottysql.implementation(for_type=ast.Resolve)
+def asdottysql(expr):
+    if not isinstance(expr.rhs, ast.Literal):
+        return "<expression cannot be formatted as DottySQL>"
+
+    return _format_binary(expr.lhs, ast.Var(expr.rhs.value),
+                          infix()[ast.Resolve], lspace="", rspace="")
 
 
 @asdottysql.implementation(for_type=ast.Repeat)

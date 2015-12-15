@@ -31,7 +31,6 @@ from efilter import syntax
 EXPRESSIONS = {
     "var": ast.Var,
     "!": ast.Complement,
-    "reverse": ast.Reverse,
     "pair": ast.Pair,
     "select": ast.Select,
     "isa": ast.IsInstance,
@@ -47,6 +46,7 @@ EXPRESSIONS = {
     "bind": ast.Bind,
     "if": ast.IfElse,
     ":": ast.Pair,
+    ".": ast.Resolve,
     "|": ast.Union,
     "&": ast.Intersection,
     ">": ast.StrictOrderedSet,

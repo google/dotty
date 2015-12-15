@@ -22,6 +22,8 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import unittest
 
+from efilter_tests import mocks
+
 from efilter.protocols import applicative
 
 
@@ -30,8 +32,5 @@ from efilter.protocols import applicative
 
 class ApplicativeTest(unittest.TestCase):
     def testApplyingFunction(self):
-        def _do_stuff(foo, bar):
-            return "%s, %s" % (foo, bar)
-
-        result = applicative.apply(_do_stuff, ["x"], dict(bar="y"))
-        self.assertEqual(result, "x, y")
+        result = applicative.apply(mocks.MockFunction(), [10], dict(y=20))
+        self.assertEqual(result, 200)

@@ -50,58 +50,53 @@ class SolveTest(testlib.EfilterTestCase):
 
     def testApply(self):
         self.assertEqual(
-            solve.solve(q.Query("f(x)", syntax="dottysql"),
-                        dict(f=lambda x: x * 2, x=5)).value,
-            10)
-
-        self.assertEqual(
             solve.solve(
-                q.Query("multiply(x: 5, y: 5)", syntax="dottysql"),
-                dict(multiply=lambda x, y: x * y)).value,
+                q.Query("multiply(x: 5, y: 5)"),
+                dict(multiply=mocks.MockFunction())).value,
             25)
 
         with self.assertRaises(errors.EfilterError):
             solve.solve(
-                q.Query("multiply(x: 5, 'y': 5)", syntax="dottysql"),
+                q.Query("multiply(x: 5, 'y': 5)"),
                 dict(multiply=lambda x, y: x * y))
 
     def testBind(self):
-        query = q.Query("bind('x': 5, 'y': 10)", syntax="dottysql")
+        query = q.Query("bind('x': 5, 'y': 10)")
 
         self.assertEqual(
             solve.solve(query, {}).value,
             {"x": 5, "y": 10})
 
     def testRepeat(self):
-        query = q.Query("(1, 2, 3, 4)", syntax="dottysql")
+        query = q.Query("(1, 2, 3, 4)")
         self.assertEqual(
             solve.solve(query, {}).value,
             repeated.meld(1, 2, 3, 4))
 
         # Repeated values flatten automatically.
-        query = q.Query("(1, (2, 3), 4)", syntax="dottysql")
+        query = q.Query("(1, (2, 3), 4)")
         self.assertEqual(
             solve.solve(query, {}).value,
             repeated.meld(1, 2, 3, 4))
 
         # Expressions work.
-        query = q.Query("(1, (2 + 2), 3, 4)", syntax="dottysql")
+        query = q.Query("(1, (2 + 2), 3, 4)")
         self.assertEqual(
             solve.solve(query, {}).value,
             repeated.meld(1, 4, 3, 4))
 
         # Repeated values are mono-types.
         with self.assertRaises(errors.EfilterTypeError):
-            query = q.Query("(1, 'foo', 3, 4)", syntax="dottysql")
+            query = q.Query("(1, 'foo', 3, 4)")
             solve.solve(query, {})
 
     def testTuple(self):
-        query = q.Query("[1, 2, 3]", syntax="dottysql")
+        query = q.Query("[1, 2, 3]")
         self.assertEqual(
             solve.solve(query, {}).value,
             (1, 2, 3))
 
-        query = q.Query("[x + 5, 1 == 1, y['foo']]", syntax="dottysql")
+        query = q.Query("[x + 5, 1 == 1, y['foo']]")
         self.assertEqual(
             solve.solve(query, {"x": 2, "y": {"foo": "bar"}}).value,
             (7, True, "bar"))
@@ -118,20 +113,26 @@ class SolveTest(testlib.EfilterTestCase):
             "bar")
 
     def testPair(self):
-        query = q.Query("x: y", syntax="dottysql")
+        query = q.Query("false or x: y")
         self.assertEqual(
             solve.solve(query, dict(x="foo", y="bar")).value,
             ("foo", "bar"))
 
     def testReverse(self):
-        query = ast.Reverse(
-            ast.Repeat(
-                ast.Literal(1),
-                ast.Literal(2),
-                ast.Literal(3)))
+        query = q.Query(
+            ast.Apply(
+                ast.Var("reverse"),
+                ast.Repeat(
+                    ast.Literal(1),
+                    ast.Literal(2),
+                    ast.Literal(3))))
         self.assertEquals(
             solve.solve(query, {}).value,
             repeated.meld(3, 2, 1))
+
+    def testCount(self):
+        query = q.Query("count((x, y, z))")
+        self.assertEqual(solve.solve(query, dict(x=1, y=2, z=3)).value, 3)
 
     def testMap(self):
         self.assertEqual(
@@ -141,8 +142,19 @@ class SolveTest(testlib.EfilterTestCase):
 
     def testSelect(self):
         self.assertEqual(
-            solve.solve(q.Query("x['y']", syntax="dottysql"),
+            solve.solve(q.Query("x['y']"),
                         {"x": {"y": 5}}).value,
+            5)
+
+    def testResolve(self):
+        self.assertEqual(
+            solve.solve(q.Query("x.y"),
+                        {"x": {"y": 5}}).value,
+            5)
+
+        self.assertEqual(
+            solve.solve(q.Query("x.y.z"),
+                        {"x": {"y": {"z": 5}}}).value,
             5)
 
     def testEach(self):
@@ -293,7 +305,7 @@ class SolveTest(testlib.EfilterTestCase):
                     ast.ContainmentOrder(
                         ast.Literal((1, 2)),
                         ast.Literal((1, 2, 3)))),
-                None).value,
+                {}).value,
             True)
 
     def testMatchTrace(self):

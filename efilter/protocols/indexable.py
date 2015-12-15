@@ -53,7 +53,7 @@ def indices(x):
 
 
 class IIndexable(protocol.Protocol):
-    _protocol_functions = (indices,)
+    _required_functions = (indices,)
 
 
 # Default implementations:

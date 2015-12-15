@@ -91,22 +91,48 @@ class Protocol(object):
     """Collection of related functions that operate on a type (interface)."""
     __metaclass__ = abc.ABCMeta
 
-    _protocol_functions = set()
+    _required_functions = frozenset()
+    _optional_functions = frozenset()
 
     @classmethod
-    def functions(cls):
-        result = set(cls._protocol_functions)
+    def required(cls):
+        result = set(cls._required_functions)
 
         for scls in cls.mro():
-            protocol_functions = getattr(scls, "_protocol_functions", None)
-            if protocol_functions:
-                result.update(protocol_functions)
+            functions = getattr(scls, "_required_functions", None)
+            if functions:
+                result.update(functions)
 
         return result
 
     @classmethod
+    def optional(cls):
+        result = set(cls._optional_functions)
+
+        for scls in cls.mro():
+            functions = getattr(scls, "_optional_functions", None)
+            if functions:
+                result.update(functions)
+
+        return result
+
+    @classmethod
+    def functions(cls):
+        return cls.required() | cls.optional()
+
+    @classmethod
     def implemented(cls, for_type):
-        for function in cls.functions():
+        """Assert that protocol 'cls' is implemented for type 'for_type'.
+
+        This will cause 'for_type' to be registered with the protocol 'cls'.
+        Subsequently, protocol.isa(for_type, cls) will return True, as will
+        isinstance, issubclass and others.
+
+        Raises:
+            TypeError if 'for_type' doesn't implement all required functions.
+        """
+
+        for function in cls.required():
             if not function.implemented_for_type(for_type):
                 raise TypeError(
                     "%r doesn't implement %r so it cannot participate in "
@@ -114,6 +140,26 @@ class Protocol(object):
                     (for_type, function.func.func_name, cls))
 
         cls.register(for_type)
+
+    @staticmethod
+    def __get_type_args(for_type=None, for_types=None):
+        """Parse the arguments and return a tuple of types to implement for.
+
+        Raises:
+            ValueError or TypeError as appropriate.
+        """
+        if for_type:
+            if for_types:
+                raise ValueError("Cannot pass both for_type and for_types.")
+            for_types = (for_type,)
+        elif for_types:
+            if not isinstance(for_types, tuple):
+                raise TypeError("for_types must be passed as a tuple of "
+                                "types (classes).")
+        else:
+            raise ValueError("Must pass either for_type or for_types.")
+
+        return for_types
 
     @classmethod
     def _implement_for_type(cls, for_type, implementations):
@@ -133,15 +179,28 @@ class Protocol(object):
                            implementation=impl)
             remaining.remove(func)
 
-        if remaining:
-            raise TypeError(
-                "%s.implement invokation must provide implementations of "
-                "%r" % (cls.__name__, remaining))
-
         cls.implemented(for_type=for_type)
 
+    @staticmethod
+    def _get_static_dispatcher(for_type, function):
+        method = getattr(for_type, function.func_name, None)
+
+        if getattr(method, "im_self", None) == for_type:
+            # This is a classmethod. In Python, there's really no such
+            # thing as a class method - they are instance methods with
+            # the self argument automatically bound to the class. In a true
+            # Python fashion, this has a ton of edge cases, the most
+            # problematic of which is the fact that, unlike instance
+            # methods, class methods cannot be called as functions with
+            # a cls argument. We steer clear of the whole mess by just
+            # grabbing the function that was passed to the classmethod
+            # decorator.
+            method = method.im_func
+
+        return method
+
     @classmethod
-    def implicit_static(cls, for_type):
+    def implicit_static(cls, for_type=None, for_types=None):
         """Automatically generate implementations for a type.
 
         Implement the protocol for the 'for_type' type by dispatching each
@@ -154,17 +213,26 @@ class Protocol(object):
         Raises:
             TypeError if not all implementations are provided by 'for_type'.
         """
-        implementations = {}
-        for function in cls.functions():
-            method = getattr(for_type, function.func_name, None)
-            if not callable(method):
-                raise TypeError(
-                    "%s.implicit invokation on type %r is missing instance "
-                    "method %r." % (cls.__name__, for_type, function.func_name))
+        for type_ in cls.__get_type_args(for_type, for_types):
+            implementations = {}
+            for function in cls.required():
+                method = cls._get_static_dispatcher(type_, function)
+                if not callable(method):
+                    raise TypeError(
+                        "%s.implicit invokation on type %r is missing instance "
+                        "method %r."
+                        % (cls.__name__, type_, function.func_name))
 
-            implementations[function] = method
+                implementations[function] = method
 
-        return cls.implement(for_type=for_type, implementations=implementations)
+            for function in cls.optional():
+                method = cls._get_static_dispatcher(type_, function)
+
+                if callable(method):
+                    implementations[function] = method
+
+            return cls.implement(for_type=type_,
+                                 implementations=implementations)
 
     @staticmethod
     def _build_late_dispatcher(func_name):
@@ -193,10 +261,10 @@ class Protocol(object):
         return _late_dynamic_dispatcher
 
     @classmethod
-    def implicit_dynamic(cls, for_type):
+    def implicit_dynamic(cls, for_type=None, for_types=None):
         """Automatically generate late dynamic dispatchers to type.
 
-        This is similar to 'implicit_static', except instead of var the
+        This is similar to 'implicit_static', except instead of binding the
         instance methods, it generates a dispatcher that will call whatever
         instance method of the same name happens to be available at time of
         dispatch.
@@ -207,12 +275,13 @@ class Protocol(object):
         Arguments:
             for_type: The type to implictly implement the protocol with.
         """
-        implementations = {}
-        for function in cls.functions():
-            implementations[function] = cls._build_late_dispatcher(
-                func_name=function.func_name)
+        for type_ in cls.__get_type_args(for_type, for_types):
+            implementations = {}
+            for function in cls.functions():
+                implementations[function] = cls._build_late_dispatcher(
+                    func_name=function.func_name)
 
-        return cls.implement(for_type=for_type, implementations=implementations)
+            cls.implement(for_type=type_, implementations=implementations)
 
     @classmethod
     def implement(cls, implementations, for_type=None, for_types=None):
@@ -236,17 +305,6 @@ class Protocol(object):
                 are issues related to polymorphism (e.g. attempting to
                 implement a non-multimethod function.
         """
-        if for_type:
-            if for_types:
-                raise ValueError("Cannot pass both for_type and for_types.")
-            for_types = (for_type,)
-        elif for_types:
-            if not isinstance(for_types, tuple):
-                raise TypeError("for_types must be passed as a tuple of "
-                                "types (classes).")
-        else:
-            raise ValueError("Must pass either for_type or for_types.")
-
-        for type_ in for_types:
+        for type_ in cls.__get_type_args(for_type, for_types):
             cls._implement_for_type(for_type=type_,
                                     implementations=implementations)

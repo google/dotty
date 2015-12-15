@@ -202,10 +202,11 @@ class multimethod(object):
                     "%r was passed None for first argument, which was "
                     "unexpected." % self.func_name)
 
+            implemented_types = [t for t, _ in self.implementations]
             raise NotImplementedError(
-                "Multimethod %r has no concrete implementation for "
-                "type %r and no default implementation. Available handlers: %r"
-                % (self.func_name, dispatch_type, self.implementations))
+                "Multimethod %r is not implemented for type %r and has no "
+                "default behavior. Overloads are defined for %r."
+                % (self.func_name, dispatch_type, implemented_types))
 
     def implemented_for_type(self, dispatch_type):
         candidate = self._find_and_cache_best_function(dispatch_type)

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # EFILTER Forensic Query Language
 #
 # Copyright 2015 Google Inc. All Rights Reserved.
@@ -16,29 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""EFILTER abstract type system."""
+"""
+EFILTER test suite.
+"""
 
-from efilter import dispatch
-from efilter import protocol
+__author__ = "Adam Sindelar <adamsh@google.com>"
 
-# Declarations:
-# pylint: disable=unused-argument
+import unittest
 
+from efilter.protocols import repeated
 
-@dispatch.multimethod
-def compare(x, y):
-    raise NotImplementedError()
-
-
-class IOrdered(protocol.Protocol):
-    _required_functions = (compare,)
+from efilter.stdlib import core
 
 
-# Default implementations:
+class CoreTest(unittest.TestCase):
+    def testCount(self):
+        self.assertEquals(
+            core.Count()(repeated.meld(1, 2, 3, 4)),
+            4)
 
-IOrdered.implement(
-    for_type=protocol.AnyType,
-    implementations={
-        compare: cmp
-    }
-)
+    def testReverse(self):
+        self.assertEquals(
+            core.Reverse()(repeated.meld(1, 2, 3, 4)),
+            repeated.meld(4, 3, 2, 1))

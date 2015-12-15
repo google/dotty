@@ -71,11 +71,11 @@ class InferTypeTest(testlib.EfilterTestCase):
                 mocks.MockRootType),
             boolean.IBoolean)
 
-    def testReverse(self):
-        """Reverse should preserve the type of the operand."""
+    def testCount(self):
+        """Count is pretty simple."""
         self.assertIsa(
             infer_type.infer_type(
-                q.Query(("reverse", ("repeat", 1, 2, 3))),
+                q.Query(("apply", ("var", "count"), ("repeat", 1, 2, 3))),
                 mocks.MockRootType),
             number.INumber)
 
@@ -96,15 +96,28 @@ class InferTypeTest(testlib.EfilterTestCase):
     def testSelect(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("Process['pid']", syntax="dottysql"),
+                q.Query("Process['pid']"),
                 mocks.MockRootType),
             number.INumber)
 
         self.assertEquals(
             infer_type.infer_type(
-                q.Query("Process[var_name]", syntax="dottysql"),
+                q.Query("Process[var_name]"),
                 mocks.MockRootType),
             protocol.AnyType)
+
+    def testResolve(self):
+        self.assertIsa(
+            infer_type.infer_type(
+                q.Query("Process.pid"),
+                mocks.MockRootType),
+            number.INumber)
+
+        self.assertIsa(
+            infer_type.infer_type(
+                q.Query("Process.parent.pid"),
+                mocks.MockRootType),
+            number.INumber)
 
     def testAny(self):
         self.assertIsa(
@@ -136,7 +149,7 @@ class InferTypeTest(testlib.EfilterTestCase):
     def testApply(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("mock_func(5, 10)", syntax="dottysql"),
+                q.Query("MockFunction(5, 10)"),
                 mocks.MockRootType),
             number.INumber)
 

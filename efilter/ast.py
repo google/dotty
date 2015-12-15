@@ -31,9 +31,10 @@ from efilter.protocols import associative
 from efilter.protocols import boolean
 from efilter.protocols import eq
 from efilter.protocols import iset
-from efilter.protocols import ordered
 from efilter.protocols import number
+from efilter.protocols import ordered
 from efilter.protocols import repeated
+from efilter.protocols import structured
 
 
 class Expression(object):
@@ -150,13 +151,6 @@ class Complement(UnaryOperation):
     return_signature = boolean.IBoolean
 
 
-class Reverse(UnaryOperation):
-    """Reverse order of repeated values."""
-
-    type_signature = (repeated.IRepeated)
-    return_signature = repeated.IRepeated
-
-
 ### Binary expressions ###
 
 class Pair(BinaryExpression):
@@ -193,6 +187,29 @@ class Select(BinaryExpression):
         return self.rhs
 
 
+class Resolve(BinaryExpression):
+    """Represents the resolution of the member (rhs) from the object (lhs).
+
+    This is analogous to the dot (.) operator in most languages.
+
+    A similar result can be achieved using map(value, var(...)) but the map
+    construct is subject to lexical scoping rules and could end up returning
+    something that was available in the outside scope, but wasn't a member of
+    the object.
+    """
+
+    type_signature = (structured.IStructured, protocol.AnyType)
+    return_signature = None
+
+    @property
+    def obj(self):
+        return self.lhs
+
+    @property
+    def member(self):
+        return self.rhs
+
+
 class IsInstance(BinaryExpression):
     """Evaluates to True if the current scope is an instance of type."""
 
@@ -206,7 +223,7 @@ class Within(BinaryExpression):
     objects.
     """
     __abstract = True
-    type_signature = (associative.IAssociative, protocol.AnyType)
+    type_signature = (structured.IStructured, protocol.AnyType)
     return_signature = None  # Depends on RHS.
 
     @property

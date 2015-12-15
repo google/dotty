@@ -47,7 +47,7 @@ def quotient(x, y):
 
 
 class INumber(protocol.Protocol):
-    _protocol_functions = (sum, product, difference, quotient)
+    _required_functions = (sum, product, difference, quotient)
 
 
 # Default implementations:

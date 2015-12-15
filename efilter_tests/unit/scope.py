@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # EFILTER Forensic Query Language
 #
 # Copyright 2015 Google Inc. All Rights Reserved.
@@ -16,29 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""EFILTER abstract type system."""
+"""
+EFILTER test suite.
+"""
 
-from efilter import dispatch
-from efilter import protocol
+__author__ = "Adam Sindelar <adamsh@google.com>"
 
-# Declarations:
-# pylint: disable=unused-argument
+import unittest
 
-
-@dispatch.multimethod
-def compare(x, y):
-    raise NotImplementedError()
+from efilter import scope
 
 
-class IOrdered(protocol.Protocol):
-    _required_functions = (compare,)
+class ScopeTest(unittest.TestCase):
+    def testResolutionOrder(self):
+        s = scope.ScopeStack({"x": 1}, {"x:": 2}, {"x": 3})
+        self.assertEqual(s.locals, {"x": 3})
+        self.assertEqual(s.globals, {"x": 1})
+        self.assertEqual(s.resolve("x"), 3)
 
+    def testStacking(self):
+        s = scope.ScopeStack({"x": 1}, {"x:": 2})
+        s = scope.ScopeStack(s, {"x": 3})
 
-# Default implementations:
-
-IOrdered.implement(
-    for_type=protocol.AnyType,
-    implementations={
-        compare: cmp
-    }
-)
+        # Stack remains flat.
+        self.assertEqual(s.locals, {"x": 3})
+        self.assertEqual(s.globals, {"x": 1})

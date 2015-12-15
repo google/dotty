@@ -36,7 +36,7 @@ def ne(x, y):
 
 
 class IEq(protocol.Protocol):
-    _protocol_functions = (eq, ne)
+    _required_functions = (eq, ne)
 
 
 # Default implementations:

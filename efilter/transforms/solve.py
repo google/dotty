@@ -20,10 +20,10 @@ EFILTER individual object filter and matcher.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-
 # pylint: disable=function-redefined
 
 import collections
+import itertools
 import re
 
 from efilter import ast
@@ -31,17 +31,20 @@ from efilter import dispatch
 from efilter import errors
 from efilter import protocol
 from efilter import query as q
-
+from efilter import scope
 
 from efilter.protocols import applicative
 from efilter.protocols import associative
 from efilter.protocols import boolean
 from efilter.protocols import iset
+from efilter.protocols import number
 from efilter.protocols import reflective
 from efilter.protocols import repeated
+from efilter.protocols import structured
 
+from efilter.stdlib import core as std_core
 
-Result = collections.namedtuple("Result", ["value", "branch", "sort_key"])
+Result = collections.namedtuple("Result", ["value", "branch"])
 
 
 @dispatch.multimethod
@@ -68,10 +71,6 @@ def solve(query, vars):
                 This only applies to simple queries using AND/OR and NOT
                 operators, which evaluate to booleans and can terminate early.
                 For other queries this will be set to None.
-
-            sort_key: A key by which the 'vars' should be sorted with
-                respect to other groups of vars of the same type. Not
-                currently implemented.
     """
     _ = query, vars
     raise NotImplementedError()
@@ -79,6 +78,10 @@ def solve(query, vars):
 
 @solve.implementation(for_type=q.Query)
 def solve(query, vars):
+    # Always include the standard library for now. We will revisit this later,
+    # and probably add something to the AST for explicit imports.
+    vars = scope.ScopeStack(std_core.FUNCTIONS, vars)
+
     try:
         return solve(query.root, vars)
     except errors.EfilterError as error:
@@ -91,14 +94,14 @@ def solve(query, vars):
 def solve(expr, vars):
     """Returns just the value of literal."""
     _ = vars
-    return Result(expr.value, (), ())
+    return Result(expr.value, ())
 
 
 @solve.implementation(for_type=ast.Var)
 def solve(expr, vars):
     """Returns the value of the var (var) named in the expression."""
     try:
-        return Result(associative.resolve(vars, expr.value), (), ())
+        return Result(structured.resolve(vars, expr.value), ())
     except (KeyError, AttributeError) as e:
         # Raise a better exception for accessing a non-existent member.
         raise errors.EfilterKeyError(root=expr, key=expr.value, message=e)
@@ -127,11 +130,10 @@ def solve(expr, vars):
 
     try:
         results = [associative.select(d, key) for d in repeated.getvalues(data)]
-        result = repeated.meld(*results)
-    except (KeyError, AttributeError) as e:
-        # Raise a better exception for accessing a non-existent member.
-        raise errors.EfilterKeyError(root=expr, key=expr.value, message=e)
-    except (TypeError, ValueError) as e:
+    except (KeyError, AttributeError):
+        # Raise a better exception for accessing a non-existent key.
+        raise errors.EfilterKeyError(root=expr, key=key)
+    except (TypeError, ValueError):
         # Raise a better exception for what is probably a null pointer error.
         if vars is None:
             raise errors.EfilterNoneError(
@@ -139,12 +141,40 @@ def solve(expr, vars):
                 message="Cannot select key %r from a null." % key)
         else:
             raise
-    except NotImplementedError as e:
+    except NotImplementedError:
         raise errors.EfilterError(
             root=expr,
             message="Cannot select keys from a non-associative value.")
 
-    return Result(result, (), ())
+    return Result(repeated.meld(*results), ())
+
+
+@solve.implementation(for_type=ast.Resolve)
+def solve(expr, vars):
+    """Use IStructured.resolve to get member (rhs) from the object (lhs)."""
+    objs = __within_lhs_as_repeated(expr.lhs, vars)
+    member = solve(expr.rhs, vars).value
+
+    try:
+        results = [structured.resolve(o, member)
+                   for o in repeated.getvalues(objs)]
+    except (KeyError, AttributeError):
+        # Raise a better exception for the non-existent member.
+        raise errors.EfilterKeyError(root=expr.rhs, key=member)
+    except (TypeError, ValueError):
+        # Is this a null object error?
+        if vars is None:
+            raise errors.EfilterNoneError(
+                root=expr,
+                message="Cannot resolve member %r from a null." % member)
+        else:
+            raise
+    except NotImplementedError:
+        raise errors.EfilterError(
+            root=expr,
+            message="Cannot resolve members from a non-structured value.")
+
+    return Result(repeated.meld(*results), ())
 
 
 @solve.implementation(for_type=ast.Apply)
@@ -172,7 +202,7 @@ def solve(expr, vars):
 
     result = applicative.apply(func, args, kwargs)
 
-    return Result(result, (), ())
+    return Result(result, ())
 
 
 @solve.implementation(for_type=ast.Bind)
@@ -189,7 +219,7 @@ def solve(expr, vars):
         value = solve(pair.value, vars).value
         result[key] = value
 
-    return Result(result, (), ())
+    return Result(result, ())
 
 
 @solve.implementation(for_type=ast.Repeat)
@@ -197,7 +227,7 @@ def solve(expr, vars):
     """Build a repeated value from subexpressions."""
     try:
         result = repeated.meld(*[solve(x, vars).value for x in expr.children])
-        return Result(result, (), ())
+        return Result(result, ())
     except TypeError:
         raise errors.EfilterTypeError(
             root=expr,
@@ -208,7 +238,7 @@ def solve(expr, vars):
 def solve(expr, vars):
     """Build a tuple from subexpressions."""
     result = tuple(solve(x, vars).value for x in expr.children)
-    return Result(result, (), ())
+    return Result(result, ())
 
 
 @solve.implementation(for_type=ast.IfElse)
@@ -252,18 +282,18 @@ def solve(expr, vars):
     evaluate to {"name": "Bob"}, which subdict will then be used on the RHS as
     new vars, and that whole form will evaluate to "Bob".
     """
-    var = __within_lhs_as_repeated(expr.lhs, vars)
+    lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
 
     try:
-        values = []
-        for value in repeated.getvalues(var):
-            value_ = solve(expr.rhs, value)
-            values.append(value_.value)
+        results = []
+        for lhs_value in repeated.getvalues(lhs_values):
+            nested_scope = scope.ScopeStack(vars, lhs_value)
+            results.append(solve(expr.rhs, nested_scope).value)
     except errors.EfilterNoneError as error:
         error.root = expr
         raise
 
-    return Result(repeated.meld(*values), (), ())
+    return Result(repeated.meld(*results), ())
 
 
 @solve.implementation(for_type=ast.Filter)
@@ -272,22 +302,25 @@ def solve(expr, vars):
 
     Returns any LHS values for which RHS evaluates to a true value.
     """
-    var = __within_lhs_as_repeated(expr.lhs, vars)
+    lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
 
     results = []
-    for value in repeated.getvalues(var):
-        if solve(expr.rhs, value).value:
-            results.append(value)
+    for lhs_value in repeated.getvalues(lhs_values):
+        nested_scope = scope.ScopeStack(vars, lhs_value)
+        if solve(expr.rhs, nested_scope).value:
+            results.append(lhs_value)
 
-    return Result(repeated.meld(*results), (), ())
+    return Result(repeated.meld(*results), ())
 
 
 @solve.implementation(for_type=ast.Sort)
 def sort(expr, vars):
     """Sort values on the LHS by the value they yield when passed to RHS."""
-    values = repeated.getvalues(__within_lhs_as_repeated(expr.lhs, vars))
-    values = sorted(values, key=lambda val: solve(expr.rhs, val))
-    return Result(repeated.meld(*values), (), ())
+    lhs_values = repeated.getvalues(__within_lhs_as_repeated(expr.lhs, vars))
+    results = sorted(lhs_values,
+                     key=lambda x: solve(expr.rhs, scope.ScopeStack(vars, x)))
+
+    return Result(repeated.meld(*results), ())
 
 
 @solve.implementation(for_type=ast.Each)
@@ -300,23 +333,25 @@ def solve(expr, vars):
     IAssociative objects then RHS will be evaluated with each state and True
     will be returned only if each result is true.
     """
-    branch_vars = __within_lhs_as_repeated(expr.lhs, vars)
-    for state in repeated.getvalues(branch_vars):
-        result = solve(expr.rhs, state)
+    lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
+
+    for lhs_value in repeated.getvalues(lhs_values):
+        result = solve(expr.rhs, scope.ScopeStack(vars, lhs_value))
         if not result.value:
             # Each is required to return an actual boolean.
             return result._replace(value=False)
 
-    return Result(True, (), ())
+    return Result(True, ())
 
 
 @solve.implementation(for_type=ast.Any)
 def solve(expr, vars):
     """Same as Each, except returning True on first true result at LHS."""
-    branch_vars = __within_lhs_as_repeated(expr.lhs, vars)
-    result = Result(False, (), ())
-    for state in repeated.getvalues(branch_vars):
-        result = solve(expr.rhs, state)
+    lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
+
+    result = Result(False, ())
+    for lhs_value in repeated.getvalues(lhs_values):
+        result = solve(expr.rhs, scope.ScopeStack(vars, lhs_value))
         if result.value:
             # Any is required to return an actual boolean.
             return result._replace(value=True)
@@ -329,7 +364,7 @@ def solve(expr, vars):
     """Typecheck whether LHS is type on the RHS."""
     lhs = solve(expr.lhs, vars)
     t = reflective.reflect(type(vars), expr.rhs)
-    return Result(protocol.implements(lhs.value, t), (), ())
+    return Result(protocol.implements(lhs.value, t), ())
 
 
 @solve.implementation(for_type=ast.Complement)
@@ -338,17 +373,9 @@ def solve(expr, vars):
     return result._replace(value=not result.value)
 
 
-@solve.implementation(for_type=ast.Reverse)
-def solve(expr, vars):
-    """Reverse the order of values in a repeated value (not a list literal)."""
-    values = repeated.getvalues(solve(expr.value, vars).value)
-    result = repeated.meld(*reversed(values))
-    return Result(result, (), ())
-
-
 @solve.implementation(for_type=ast.Intersection)
 def solve(expr, vars):
-    result = Result(False, (), ())
+    result = Result(False, ())
     for child in expr.children:
         result = solve(child, vars)
         if not result.value:
@@ -370,51 +397,92 @@ def solve(expr, vars):
                 return result
             return result._replace(branch=child)
 
-    return Result(False, (), ())
+    return Result(False, ())
 
 
 @solve.implementation(for_type=ast.Pair)
 def solve(expr, vars):
     return Result((solve(expr.lhs, vars).value, solve(expr.rhs, vars).value),
-                  (), ())
+                  ())
 
 
 @solve.implementation(for_type=ast.Sum)
 def solve(expr, vars):
     total = 0
-    for child in expr.children:
-        total += solve(child, vars).value
 
-    return Result(total, (), ())
+    for child in expr.children:
+        val = solve(child, vars).value
+        try:
+            total += val
+        except TypeError:
+            raise errors.EfilterTypeError(expected=number.INumber,
+                                          actual=type(val),
+                                          root=child)
+
+    return Result(total, ())
 
 
 @solve.implementation(for_type=ast.Difference)
 def solve(expr, vars):
-    children = iter(expr.children)
-    difference = solve(next(children), vars).value
-    for child in children:
-        difference -= solve(child, vars).value
+    children = enumerate(expr.children)
+    _, first_child = next(children)
+    difference = solve(first_child, vars).value
 
-    return Result(difference, (), ())
+    for idx, child in children:
+        val = solve(child, vars).value
+        try:
+            difference -= val
+        except TypeError:
+            # The type what caused that there error.
+            if idx == 1:
+                actual_t = type(difference)
+            else:
+                actual_t = type(val)
+
+            raise errors.EfilterTypeError(expected=number.INumber,
+                                          actual=actual_t,
+                                          root=expr.children[idx - 1])
+
+    return Result(difference, ())
 
 
 @solve.implementation(for_type=ast.Product)
 def solve(expr, vars):
     product = 1
-    for child in expr.children:
-        product *= solve(child, vars).value
 
-    return Result(product, (), ())
+    for child in expr.children:
+        val = solve(child, vars).value
+        try:
+            product *= val
+        except TypeError:
+            raise errors.EfilterTypeError(expected=number.INumber,
+                                          actual=type(val),
+                                          root=child)
+
+    return Result(product, ())
 
 
 @solve.implementation(for_type=ast.Quotient)
 def solve(expr, vars):
-    children = iter(expr.children)
-    quotient = solve(next(children), vars).value
-    for child in children:
-        quotient /= solve(child, vars).value
+    children = enumerate(expr.children)
+    _, first_child = next(children)
+    quotient = solve(first_child, vars).value
 
-    return Result(quotient, (), ())
+    for idx, child in children:
+        val = solve(child, vars).value
+        try:
+            quotient /= val
+        except TypeError:
+            # The type what caused that there error.
+            if idx == 1:
+                actual_t = type(quotient)
+            else:
+                actual_t = type(val)
+            raise errors.EfilterTypeError(expected=number.INumber,
+                                          actual=actual_t,
+                                          root=expr.children[idx - 1])
+
+    return Result(quotient, ())
 
 
 @solve.implementation(for_type=ast.Equivalence)
@@ -423,16 +491,16 @@ def solve(expr, vars):
     first_value = solve(next(children), vars).value
     for child in children:
         if solve(child, vars).value != first_value:
-            return Result(False, (), ())
+            return Result(False, ())
 
-    return Result(True, (), ())
+    return Result(True, ())
 
 
 @solve.implementation(for_type=ast.Membership)
 def solve(expr, vars):
     element = solve(expr.element, vars).value
     values = solve(expr.set, vars).value
-    return Result(element in values, (), ())
+    return Result(element in values, ())
 
 
 @solve.implementation(for_type=ast.RegexFilter)
@@ -440,7 +508,7 @@ def solve(expr, vars):
     string = solve(expr.string, vars).value
     pattern = solve(expr.regex, vars).value
 
-    return Result(re.compile(pattern).match(str(string)), (), ())
+    return Result(re.compile(pattern).match(str(string)), ())
 
 
 @solve.implementation(for_type=ast.ContainmentOrder)
@@ -451,10 +519,10 @@ def solve(expr, vars):
     for y in iterator:
         y = solve(y, vars).value
         if not iset.issubset(x, y):
-            return Result(False, (), ())
+            return Result(False, ())
         x = y
 
-    return Result(True, (), ())
+    return Result(True, ())
 
 
 @solve.implementation(for_type=ast.StrictOrderedSet)
@@ -463,17 +531,17 @@ def solve(expr, vars):
     min_ = solve(next(iterator), vars).value
 
     if min_ is None:
-        return Result(False, (), ())
+        return Result(False, ())
 
     for child in iterator:
         val = solve(child, vars).value
 
         if not min_ > val or val is None:
-            return Result(False, (), ())
+            return Result(False, ())
 
         min_ = val
 
-    return Result(True, (), ())
+    return Result(True, ())
 
 
 @solve.implementation(for_type=ast.PartialOrderedSet)
@@ -482,14 +550,14 @@ def solve(expr, vars):
     min_ = solve(next(iterator), vars).value
 
     if min_ is None:
-        return Result(False, (), ())
+        return Result(False, ())
 
     for child in iterator:
         val = solve(child, vars).value
 
         if min_ < val or val is None:
-            return Result(False, (), ())
+            return Result(False, ())
 
         min_ = val
 
-    return Result(True, (), ())
+    return Result(True, ())

@@ -38,7 +38,7 @@ class AsDottySQLTest(unittest.TestCase):
 
     def assertOutput(self, original, output):
         if isinstance(original, basestring):
-            q = query.Query(original, syntax="dottysql")
+            q = query.Query(original)
         else:
             q = query.Query(original)
 
@@ -108,6 +108,9 @@ class AsDottySQLTest(unittest.TestCase):
     def testReverse(self):
         self.assertOutput("reverse((1, 2, 3))", "reverse((1, 2, 3))")
 
+    def testCount(self):
+        self.assertOutput("count((1, 2, 3))", "count((1, 2, 3))")
+
     def testBind(self):
         self.assertOutput("bind('x': 1, 'y': 2)", "bind('x': 1, 'y': 2)")
 
@@ -153,6 +156,11 @@ class AsDottySQLTest(unittest.TestCase):
         self.assertOutput(
             original="(x or y)[5]",
             output="(x or y)[5]")
+
+    def testResolve(self):
+        self.assertOutput(
+            original="x.y.z",
+            output="x.y.z")
 
     def testRepeat(self):
         self.assertOutput(

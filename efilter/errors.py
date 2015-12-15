@@ -122,12 +122,12 @@ class EfilterKeyError(EfilterError):
             return self.message
 
         if self.key:
-            return "No key %r." % self.key
+            return "No such key %r." % self.key
 
         return None
 
     def __init__(self, *args, **kwargs):
-        self.expected = kwargs.pop("key", None)
+        self.key = kwargs.pop("key", None)
 
         super(EfilterKeyError, self).__init__(*args, **kwargs)
 

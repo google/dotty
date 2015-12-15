@@ -24,30 +24,45 @@ import collections
 
 from efilter.protocols import applicative
 from efilter.protocols import associative
-from efilter.protocols import reflective
+from efilter.protocols import structured
+
+from efilter.stdlib import core as std_core
 
 
 class MockFunction(object):
-    def apply(self, x, y):
-        return x + y
+    def apply(self, args, kwargs):
+        return self(*args, **kwargs)
+
+    def __call__(self, x, y):
+        return x * y
 
     @classmethod
-    def reflect_return(cls):
+    def reflect_static_args(cls):
+        return ("x", int), ("y", int)
+
+    @classmethod
+    def reflect_static_return(cls):
         return int
-
-    @classmethod
-    def reflect_args(cls):
-        (int, int)
 
 
 class Process(collections.namedtuple("Process", ["pid", "name", "parent"])):
     @classmethod
-    def reflect(cls, name):
+    def reflect_static_member(cls, name):
         return PROCESS_DEFS.get(name)
+
+    @classmethod
+    def reflect_static_key(cls, key):
+        return cls.reflect_static_member(key)
 
     @classmethod
     def getkeys(cls):
         return PROCESS_DEFS.keys()
+
+    def resolve(self, name):
+        return getattr(self, name)
+
+    def select(self, key):
+        return self.resolve(key)
 
 
 PROCESS_DEFS = {
@@ -58,12 +73,22 @@ PROCESS_DEFS = {
 
 class _proc(collections.namedtuple("_proc", ["p_pid", "p_comm", "p_ppid"])):
     @classmethod
-    def reflect(cls, name):
-        return PROCESS_DEFS.get(name)
+    def reflect_static_member(cls, name):
+        return PROC_DEFS.get(name)
+
+    @classmethod
+    def reflect_static_key(cls, key):
+        return cls.reflect_static_member(key)
 
     @classmethod
     def getkeys(cls):
-        return PROCESS_DEFS.keys()
+        return PROC_DEFS.keys()
+
+    def resolve(self, name):
+        return getattr(self, name)
+
+    def select(self, key):
+        return self.resolve(key)
 
 
 PROC_DEFS = {
@@ -72,18 +97,9 @@ PROC_DEFS = {
     "p_ppid": int}
 
 
-associative.IAssociative.implement(
-    for_types=(Process, _proc),
-    implementations={
-        associative.select: lambda x, k: getattr(x, k, None),
-        associative.resolve: lambda x, k: getattr(x, k, None)
-    }
-)
-
-
-reflective.IReflective.implicit_dynamic(Process)
-reflective.IReflective.implicit_dynamic(_proc)
-applicative.IApplicative.implicit_dynamic(MockFunction)
+structured.IStructured.implicit_static(for_types=(Process, _proc))
+associative.IAssociative.implicit_static(for_types=(Process, _proc))
+applicative.IApplicative.implicit_static(MockFunction)
 
 
 class MockRootType(object):
@@ -105,28 +121,19 @@ class MockRootType(object):
         }
     }
 
-    GLOBALS = {
-        "_root_proc": _proc(1, "init", 0),
-        "_current_proc": _proc(2, "foo", 1),
-        "mock_func": MockFunction(),
-    }
+    def resolve(self, name):
+        return self.DEFS[name]()
 
     @classmethod
-    def reflect(cls, name):
-        if name == "Process":
-            return Process
+    def reflect_static_member(cls, name):
+        if name in cls.DEFS:
+            return cls.DEFS[name]["_"]
 
-        if name == "_proc":
-            return _proc
-
-        if name == "mock_func":
-            return MockFunction
-
-        return None
+        return type(std_core.FUNCTIONS.get(name))
 
     @classmethod
-    def getkeys(cls):
-        return ("Process", "_proc", "mock_func")
+    def getmembers_static(cls):
+        return cls.DEFS.keys()
 
 
-reflective.IReflective.implicit_dynamic(MockRootType)
+structured.IStructured.implicit_static(MockRootType)

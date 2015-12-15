@@ -32,21 +32,62 @@ def select(associative, key):
     raise NotImplementedError()
 
 
-@dispatch.multimethod
-def resolve(associative, key):
+def getkeys(associative):
+    if isinstance(associative, type):
+        return getkeys_static(associative)
+
+    return getkeys_runtime(associative)
+
+
+@dispatch.class_multimethod
+def getkeys_static(associative_cls):
     raise NotImplementedError()
 
 
+@dispatch.multimethod
+def getkeys_runtime(associative):
+    return getkeys_static(type(associative))
+
+
+def reflect(associative, key):
+    if isinstance(associative, type):
+        return reflect_static_key(associative, key)
+
+    return reflect_runtime_key(associative, key)
+
+
+@dispatch.class_multimethod
+def reflect_static_key(associative_cls, key):
+    """Provide the type of 'key' which is a member of 'associative_cls'.
+
+    Arguments:
+        associative_cls: The type of the associative object (like a dict).
+        key: The name to be reflected. Must be a member of  'associative_cls'.
+
+    Returns:
+        The type of 'name' or None. Invalid names should return None,
+        whereas valid names with unknown type should return AnyType.
+    """
+    raise NotImplementedError()
+
+
+@dispatch.multimethod
+def reflect_runtime_key(associative, key):
+    return reflect_static_key(type(associative), key)
+
+
 class IAssociative(protocol.Protocol):
-    _protocol_functions = (select, resolve)
+    _required_functions = (select,)
+    _optional_functions = (reflect_runtime_key, reflect_static_key,
+                           getkeys_runtime, getkeys_static)
 
 
 IAssociative.implement(for_type=dict,
                        implementations={
-                           select: lambda d, key: d.get(key),
-                           resolve: lambda d, key: d.get(key)})
+                           select: lambda d, key: d[key],
+                           getkeys_runtime: lambda d: d.keys()})
 
 IAssociative.implement(for_type=counted.ICounted,
                        implementations={
                            select: lambda c, idx: c[idx],
-                           resolve: lambda c, idx: c[idx]})
+                           getkeys_runtime: lambda c: xrange(counted.count(c))})

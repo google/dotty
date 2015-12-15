@@ -39,7 +39,7 @@ def graze(cow):
 
 
 class IBovine(protocol.Protocol):
-    _protocol_functions = (say_moo, graze)
+    _required_functions = (say_moo, graze)
 
 
 class Kyr(object):

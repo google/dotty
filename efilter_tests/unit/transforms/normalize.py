@@ -42,14 +42,16 @@ class NormalizeTest(testlib.EfilterTestCase):
     def testReverse(self):
         """Make sure that reverse gets normalized."""
         original = query.Query(
-            ("reverse",
+            ("apply",
+                ("var", "reverse"),
                 ("repeat",
                     ("var", "x"),
                     ("var", "y"),
                     ("|", 1, ("|", 2, 3)))))
 
         expected = query.Query(
-            ("reverse",
+            ("apply",
+                ("var", "reverse"),
                 ("repeat",
                     ("var", "x"),
                     ("var", "y"),

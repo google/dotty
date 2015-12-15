@@ -133,30 +133,30 @@ class ParserTest(unittest.TestCase):
         self.assertQueryMatches(
             "obj.props[0]",
             ast.Select(
-                ast.Map(
+                ast.Resolve(
                     ast.Var("obj"),
-                    ast.Var("props")),
+                    ast.Literal("props")),
                 ast.Literal(0)))
 
         self.assertQueryMatches(
             "obj.props[0].foo",
-            ast.Map(
+            ast.Resolve(
                 ast.Select(
-                    ast.Map(
+                    ast.Resolve(
                         ast.Var("obj"),
-                        ast.Var("props")),
+                        ast.Literal("props")),
                     ast.Literal(0)),
-                ast.Var("foo")))
+                ast.Literal("foo")))
 
         self.assertQueryMatches(
             "obj.props[10 + 10].foo",
-            ast.Map(
+            ast.Resolve(
                 ast.Select(
-                    ast.Map(ast.Var("obj"), ast.Var("props")),
+                    ast.Resolve(ast.Var("obj"), ast.Literal("props")),
                     ast.Sum(
                         ast.Literal(10),
                         ast.Literal(10))),
-                ast.Var("foo")))
+                ast.Literal("foo")))
 
         self.assertQueryMatches(
             "w['x'][y[5] + 5] * 10",
@@ -178,9 +178,9 @@ class ParserTest(unittest.TestCase):
             ast.Filter(
                 ast.Apply(ast.Var("pslist")),
                 ast.Equivalence(
-                    ast.Map(
+                    ast.Resolve(
                         ast.Var("proc"),
-                        ast.Var("pid")),
+                        ast.Literal("pid")),
                     ast.Literal(1))))
 
         self.assertQueryMatches(
@@ -188,9 +188,9 @@ class ParserTest(unittest.TestCase):
             ast.Map(
                 ast.Apply(ast.Var("pslist")),
                 ast.Tuple(
-                    ast.Map(
+                    ast.Resolve(
                         ast.Var("proc"),
-                        ast.Var("pid")),
+                        ast.Literal("pid")),
                     ast.Select(
                         ast.Var("proc"),
                         ast.Literal("command")))))
@@ -210,13 +210,13 @@ class ParserTest(unittest.TestCase):
 
         self.assertQueryMatches(
             "w.x.y.z",
-            ast.Map(
-                ast.Map(
-                    ast.Map(
+            ast.Resolve(
+                ast.Resolve(
+                    ast.Resolve(
                         ast.Var("w"),
-                        ast.Var("x")),
-                    ast.Var("y")),
-                ast.Var("z")))
+                        ast.Literal("x")),
+                    ast.Literal("y")),
+                ast.Literal("z")))
 
         # Operator precedence should work correctly.
         self.assertQueryMatches(
@@ -384,8 +384,12 @@ class ParserTest(unittest.TestCase):
 
         self.assertQueryMatches(
             "SELECT * FROM pslist() ORDER BY pid DESC",
-            ast.Reverse(ast.Sort(ast.Apply(ast.Var("pslist")),
-                                 ast.Var("pid"))))
+            ast.Apply(
+                ast.Var("reverse"),
+                ast.Sort(
+                    ast.Apply(
+                        ast.Var("pslist")),
+                    ast.Var("pid"))))
 
     def testSelectWhere(self):
         self.assertQueryMatches(
@@ -396,7 +400,8 @@ class ParserTest(unittest.TestCase):
     def testSelectWhereOrder(self):
         self.assertQueryMatches(
             "SELECT * FROM pslist() WHERE pid == 1 ORDER BY command DESC",
-            ast.Reverse(
+            ast.Apply(
+                ast.Var("reverse"),
                 ast.Sort(
                     ast.Filter(
                         ast.Apply(ast.Var("pslist")),
@@ -435,16 +440,16 @@ class ParserTest(unittest.TestCase):
                 ast.Bind(
                     ast.Pair(
                         ast.Literal("ppid"),
-                        ast.Map(
-                            ast.Map(
+                        ast.Resolve(
+                            ast.Resolve(
                                 ast.Var("proc"),
-                                ast.Var("parent")),
-                            ast.Var("pid"))),
+                                ast.Literal("parent")),
+                            ast.Literal("pid"))),
                     ast.Pair(
                         ast.Literal("pid"),
-                        ast.Map(
+                        ast.Resolve(
                             ast.Var("proc"),
-                            ast.Var("pid"))),
+                            ast.Literal("pid"))),
                     ast.Pair(
                         ast.Literal(2),
                         ast.Literal("foo")))))
@@ -462,23 +467,23 @@ class ParserTest(unittest.TestCase):
                     ast.StrictOrderedSet(
                         ast.Apply(
                             ast.Var("COUNT"),
-                            ast.Map(
+                            ast.Resolve(
                                 ast.Var("proc"),
-                                ast.Var("open_files"))),
+                                ast.Literal("open_files"))),
                         ast.Literal(10))),
                 ast.Bind(
                     ast.Pair(
                         ast.Literal("ppid"),
-                        ast.Map(
-                            ast.Map(
+                        ast.Resolve(
+                            ast.Resolve(
                                 ast.Var("proc"),
-                                ast.Var("parent")),
-                            ast.Var("pid"))),
+                                ast.Literal("parent")),
+                            ast.Literal("pid"))),
                     ast.Pair(
                         ast.Literal("pid"),
-                        ast.Map(
+                        ast.Resolve(
                             ast.Var("proc"),
-                            ast.Var("pid"))))),
+                            ast.Literal("pid"))))),
             ast.Literal(True))
 
         self.assertQueryMatches(query, expected)

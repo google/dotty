@@ -60,11 +60,6 @@ def normalize(expr):
     return expr
 
 
-@normalize.implementation(for_type=ast.Reverse)
-def normalize(expr):
-    return type(expr)(normalize(expr.value), start=expr.start, end=expr.end)
-
-
 @normalize.implementation(for_type=ast.BinaryExpression)
 def normalize(expr):
     """Normalize both sides, but don't eliminate the expression."""

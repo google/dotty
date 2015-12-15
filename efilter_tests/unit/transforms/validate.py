@@ -38,8 +38,7 @@ class ValidateTest(testlib.EfilterTestCase):
 
     def testValueExpression(self):
         q = query.Query("Process.pid + 5")
-        self.assertTrue(validate.validate(q),
-                        mocks.MockRootType)
+        self.assertTrue(validate.validate(q, mocks.MockRootType))
 
     def testIfElse(self):
         # Missing else:

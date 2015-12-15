@@ -27,10 +27,10 @@ from efilter.protocols import repeated
 
 
 def apply(query, replacements=None, **vars):
-    """Run 'query' on 'vars' and return results as a list."""
+    """Run 'query' on 'vars' and return results (potentially as IRepeated)."""
     query = q.Query(query, params=replacements)
     results = solve.solve(query, vars).value
-    return repeated.getvalues(results)
+    return results
 
 
 def search(query, data, replacements=None):
