@@ -23,13 +23,13 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import query as q
 from efilter.transforms import solve
-from efilter.protocols import repeated
 
 
 def apply(query, replacements=None, **vars):
     """Run 'query' on 'vars' and return results (potentially as IRepeated)."""
     query = q.Query(query, params=replacements)
     results = solve.solve(query, vars).value
+
     return results
 
 

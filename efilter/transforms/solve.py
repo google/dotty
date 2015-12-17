@@ -38,6 +38,7 @@ from efilter.protocols import associative
 from efilter.protocols import boolean
 from efilter.protocols import iset
 from efilter.protocols import number
+from efilter.protocols import ordered
 from efilter.protocols import reflective
 from efilter.protocols import repeated
 from efilter.protocols import structured
@@ -317,8 +318,14 @@ def solve(expr, vars):
 def sort(expr, vars):
     """Sort values on the LHS by the value they yield when passed to RHS."""
     lhs_values = repeated.getvalues(__within_lhs_as_repeated(expr.lhs, vars))
-    results = sorted(lhs_values,
-                     key=lambda x: solve(expr.rhs, scope.ScopeStack(vars, x)))
+
+    sort_expression = expr.rhs
+
+    def _key_func(x):
+        sort_value = solve(sort_expression, scope.ScopeStack(vars, x))
+        return ordered.assortkey(sort_value)
+
+    results = sorted(lhs_values, key=_key_func)
 
     return Result(repeated.meld(*results), ())
 
@@ -349,9 +356,16 @@ def solve(expr, vars):
     """Same as Each, except returning True on first true result at LHS."""
     lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
 
+    try:
+        rhs = expr.rhs
+    except IndexError:
+        # Child 1 is out of range. There is no condition on the RHS.
+        # Just see if we have anything on the LHS.
+        return Result(len(repeated.getvalues(lhs_values)) > 0, ())
+
     result = Result(False, ())
     for lhs_value in repeated.getvalues(lhs_values):
-        result = solve(expr.rhs, scope.ScopeStack(vars, lhs_value))
+        result = solve(rhs, scope.ScopeStack(vars, lhs_value))
         if result.value:
             # Any is required to return an actual boolean.
             return result._replace(value=True)
@@ -500,6 +514,10 @@ def solve(expr, vars):
 def solve(expr, vars):
     element = solve(expr.element, vars).value
     values = solve(expr.set, vars).value
+
+    if isinstance(values, repeated.IRepeated):
+        return Result(element in repeated.getvalues(values), ())
+
     return Result(element in values, ())
 
 
@@ -509,20 +527,6 @@ def solve(expr, vars):
     pattern = solve(expr.regex, vars).value
 
     return Result(re.compile(pattern).match(str(string)), ())
-
-
-@solve.implementation(for_type=ast.ContainmentOrder)
-def solve(expr, vars):
-    _ = vars
-    iterator = iter(expr.children)
-    x = solve(next(iterator), vars).value
-    for y in iterator:
-        y = solve(y, vars).value
-        if not iset.issubset(x, y):
-            return Result(False, ())
-        x = y
-
-    return Result(True, ())
 
 
 @solve.implementation(for_type=ast.StrictOrderedSet)

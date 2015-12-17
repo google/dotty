@@ -257,6 +257,7 @@ class Sort(Within):
 class Any(Within):
     """Returns true if the rhs evaluates as true for any value of lhs."""
     return_signature = bool
+    arity = None  # RHS is allowed to be omitted.
 
 
 class Each(Within):
@@ -395,12 +396,6 @@ class PartialOrderedSet(OrderedSet):
     """Great-or-equal than relation."""
 
     type_signature = ordered.IOrdered
-
-
-class ContainmentOrder(Relation):
-    """Inclusion of set 1 by set 2 and so on."""
-
-    type_signature = iset.ISet
 
 
 class Equivalence(Relation):

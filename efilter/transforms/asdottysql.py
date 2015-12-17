@@ -257,12 +257,4 @@ def asdottysql(expr):
     return expr.value
 
 
-# Unsupported AST.
-
-@asdottysql.implementation(for_type=ast.ContainmentOrder)
-def asdottysql(expr):
-    _ = expr
-    return "<Subexpression cannot be formatted as DottySQL.>"
-
-
 syntax.Syntax.register_formatter(shorthand="dottysql", formatter=asdottysql)

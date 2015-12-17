@@ -26,7 +26,9 @@ protocols.superposition) are a special case of repeated variables.
 from efilter import dispatch
 from efilter import protocol
 
+from efilter.protocols import counted
 from efilter.protocols import eq
+from efilter.protocols import ordered
 
 # Declarations:
 # pylint: disable=unused-argument
@@ -129,6 +131,24 @@ def _scalar_value_eq(x, y):
         return False
 
     return eq.eq(x, getvalue(y))
+
+
+# If you're repeated, you automatically implement ICounted.
+counted.ICounted.implement(
+    for_type=IRepeated,
+    implementations={
+        counted.count: lambda r: len(getvalues(r))
+    }
+)
+
+
+# Repeated value should sort as a tuple of themselves.
+ordered.IOrdered.implement(
+    for_type=IRepeated,
+    implementations={
+        ordered.assortkey: getvalues
+    }
+)
 
 
 # Implementation for scalars:

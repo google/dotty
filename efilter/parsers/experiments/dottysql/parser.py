@@ -411,13 +411,19 @@ class Parser(syntax.Syntax):
         return self.select_what()
 
     def select_any(self):
+        saved_match = self.last_match
+        # Any can be either a start of a pseudosql query or the any builtin.
+        if self.match(grammar.lparen):
+            self.last_match = saved_match
+            # The paren means we're calling 'any(...)' - the builtin.
+            return self.builtin(self.matched_value)
+
         # An optional FROM can go after ANY.
         # "SELECT ANY FROM", "ANY FROM", "SELECT ANY" and just "ANY" all mean
         # the exact same thing. The full form of SELECT ANY FROM is preferred
         # but the shorthand is very useful for writing boolean indicators and
         # so it's worth allowing it.
         start = self.matched_start
-        end = self.matched_end
         self.accept(grammar.select_from)
 
         source_expression = self.expression()
@@ -425,13 +431,16 @@ class Parser(syntax.Syntax):
         if self.accept(grammar.select_where):
             map_expression = self.expression()
         else:
-            map_expression = ast.Literal(True, start=start, end=end)
+            map_expression = None
 
         # ORDER after ANY doesn't make any sense.
         self.reject(grammar.select_order)
 
-        return ast.Any(source_expression, map_expression,
-                       start=start, end=map_expression.end)
+        if map_expression:
+            return ast.Any(source_expression, map_expression,
+                           start=start, end=map_expression.end)
+
+        return ast.Any(source_expression, start=start, end=self.matched_end)
 
     def _guess_name_of(self, expr):
         """Tries to guess what variable name 'expr' ends in."""
@@ -556,7 +565,7 @@ class Parser(syntax.Syntax):
             return self.error(
                 "%s expects %d arguments, but was passed %d." % (
                     keyword, expr_type.arity, len(arguments)),
-                start_token=keyword)
+                start_token=self.matched_tokens[0])
 
         return expr_type(*arguments, start=keyword_start, end=self.matched_end)
 

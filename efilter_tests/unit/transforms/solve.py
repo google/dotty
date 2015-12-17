@@ -175,6 +175,14 @@ class SolveTest(testlib.EfilterTestCase):
                     mocks.Process(2, None, None))}}).value,
             True)
 
+        # Test that unary ANY works as expected.
+        query = q.Query(ast.Any(ast.Var("x")))
+        self.assertEqual(solve.solve(query, {"x": None}).value, False)
+        self.assertEqual(solve.solve(query, {"x": 1}).value, True)
+        self.assertEqual(solve.solve(query,
+                                     {"x": repeated.meld(1, 2, 3)}).value,
+                         True)
+
     def testSort(self):
         self.assertEqual(
             solve.solve(
@@ -197,6 +205,50 @@ class SolveTest(testlib.EfilterTestCase):
             repeated.meld(
                 mocks.Process(1, None, None),
                 mocks.Process(2, None, None)))
+
+        # Sorting BY a repeated expression should be the same as sorting by
+        # a tuple.
+        self.assertEqual(
+            solve.solve(
+                q.Query("select name, surname from people order by "
+                        "[lower(surname), lower(name)]"),
+                {
+                    "people": [
+                        {"name": "John", "surname": "Smith"},
+                        {"name": "John", "surname": "Brown"},
+                        {"name": "John", "surname": "Lennon"},
+                        {"name": "Alice", "surname": "Brown"},
+                    ]
+                }
+            ).value,
+            repeated.meld(
+                {"name": "Alice", "surname": "Brown"},
+                {"name": "John", "surname": "Brown"},
+                {"name": "John", "surname": "Lennon"},
+                {"name": "John", "surname": "Smith"},
+            )
+        )
+
+        self.assertEqual(
+            solve.solve(
+                q.Query("select name, surname from people order by "
+                        "(lower(surname), lower(name))"),
+                {
+                    "people": [
+                        {"name": "John", "surname": "Smith"},
+                        {"name": "John", "surname": "Brown"},
+                        {"name": "John", "surname": "Lennon"},
+                        {"name": "Alice", "surname": "Brown"},
+                    ]
+                }
+            ).value,
+            repeated.meld(
+                {"name": "Alice", "surname": "Brown"},
+                {"name": "John", "surname": "Brown"},
+                {"name": "John", "surname": "Lennon"},
+                {"name": "John", "surname": "Smith"},
+            )
+        )
 
     def testFilter(self):
         self.assertEqual(
@@ -277,6 +329,13 @@ class SolveTest(testlib.EfilterTestCase):
                 mocks.Process(1, None, None)).value,
             True)
 
+        # Repeated should work, too.
+        self.assertEqual(
+            solve.solve(
+                q.Query("pid in (1, 2)"),
+                mocks.Process(1, None, None)).value,
+            True)
+
     def testRegexFilter(self):
         self.assertTrue(
             solve.solve(
@@ -295,17 +354,6 @@ class SolveTest(testlib.EfilterTestCase):
             solve.solve(
                 q.Query("pid >= 2"),
                 mocks.Process(2, None, None)).value,
-            True)
-
-    def testContainmentOrder(self):
-        self.assertEqual(
-            solve.solve(
-                q.Query(
-                    # This guy doesn't (yet) have syntax in any of the parsers.
-                    ast.ContainmentOrder(
-                        ast.Literal((1, 2)),
-                        ast.Literal((1, 2, 3)))),
-                {}).value,
             True)
 
     def testMatchTrace(self):

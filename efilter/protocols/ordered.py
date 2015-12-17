@@ -26,12 +26,12 @@ from efilter import protocol
 
 
 @dispatch.multimethod
-def compare(x, y):
+def assortkey(x):
     raise NotImplementedError()
 
 
 class IOrdered(protocol.Protocol):
-    _required_functions = (compare,)
+    _required_functions = (assortkey,)
 
 
 # Default implementations:
@@ -39,6 +39,6 @@ class IOrdered(protocol.Protocol):
 IOrdered.implement(
     for_type=protocol.AnyType,
     implementations={
-        compare: cmp
+        assortkey: lambda x: x
     }
 )

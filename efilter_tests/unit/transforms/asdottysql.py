@@ -108,6 +108,12 @@ class AsDottySQLTest(unittest.TestCase):
     def testReverse(self):
         self.assertOutput("reverse((1, 2, 3))", "reverse((1, 2, 3))")
 
+    def testAny(self):
+        self.assertOutput(
+            ("(SELECT ANY pslist WHERE pid == 1) "
+             "AND (SELECT ANY netstat WHERE socket.last_pid == 1)"),
+            ("any(pslist, pid == 1) and any(netstat, socket.last_pid == 1)"))
+
     def testCount(self):
         self.assertOutput("count((1, 2, 3))", "count((1, 2, 3))")
 
@@ -180,7 +186,3 @@ class AsDottySQLTest(unittest.TestCase):
         self.assertOutput(
             original="if foo then bar",
             output="if foo then bar")
-
-    def testContainmentOrder(self):
-        """Doesn't do anything."""
-        pass

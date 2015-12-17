@@ -24,8 +24,31 @@ import unittest
 
 from efilter import api
 
-from efilter.stdlib import core as std_core
+from efilter.protocols import repeated
+
 
 class StdlibIntegrationTest(unittest.TestCase):
     def testFuncCalls(self):
+        """Test that function calls are completed."""
         self.assertEqual(api.apply("count((1, 2, 3))"), 3)
+
+    def testCountLists(self):
+        """Test that count supports lists and IRepeated."""
+        self.assertEqual(api.apply("count((1, 2, 3))"), 3)
+
+        # Lists should work.
+        self.assertEqual(api.apply("count([1, 2, 3])"), 3)
+
+        # IRepeated are flat.
+        self.assertEqual(api.apply("count((1, (2, 3)))"), 3)
+
+        # Lists are not.
+        self.assertEqual(api.apply("count([1, [2, 3]])"), 2)
+
+    def testReverseLists(self):
+        """Test that reverse supports both lists and IRepeted."""
+        # "lists" are actually Python tuples.
+        self.assertEqual(api.apply("reverse([1, 2, 3])"), (3, 2, 1))
+
+        self.assertEqual(api.apply("reverse((1, 2, 3))"),
+                         repeated.meld(3, 2, 1))

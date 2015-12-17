@@ -37,3 +37,8 @@ class CoreTest(unittest.TestCase):
         self.assertEquals(
             core.Reverse()(repeated.meld(1, 2, 3, 4)),
             repeated.meld(4, 3, 2, 1))
+
+    def testLower(self):
+        self.assertEquals(
+            core.Lower()("FOO"),
+            "foo")

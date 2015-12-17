@@ -26,6 +26,7 @@ import itertools
 from efilter import protocol
 
 from efilter.protocols import applicative
+from efilter.protocols import counted
 from efilter.protocols import repeated
 
 
@@ -50,11 +51,30 @@ class TypedFunction(object):
 applicative.IApplicative.implicit_dynamic(TypedFunction)
 
 
+class Lower(TypedFunction):
+    """Makes a string lowercase."""
+
+    name = "lower"
+
+    def __call__(self, x):
+        return x.lower()
+
+    @classmethod
+    def reflect_static_args(cls):
+        return (basestring,)
+
+    @classmethod
+    def reflect_static_return(cls):
+        return basestring
+
+
 class Count(TypedFunction):
+    """Counts the number of elements in a tuple or of values in a repeated."""
+
     name = "count"
 
     def __call__(self, x):
-        return len(repeated.getvalues(x))
+        return counted.count(x)
 
     @classmethod
     def reflect_static_args(cls):
@@ -66,9 +86,14 @@ class Count(TypedFunction):
 
 
 class Reverse(TypedFunction):
+    """Reverses a tuple of a repeated and maintains the type."""
+
     name = "reverse"
 
     def __call__(self, x):
+        if isinstance(x, tuple):
+            return tuple(reversed(x))
+
         return repeated.meld(*reversed(repeated.getvalues(x)))
 
     @classmethod
@@ -80,4 +105,4 @@ class Reverse(TypedFunction):
         return repeated.IRepeated
 
 
-FUNCTIONS = dict(count=Count(), reverse=Reverse())
+FUNCTIONS = dict(count=Count(), reverse=Reverse(), lower=Lower())

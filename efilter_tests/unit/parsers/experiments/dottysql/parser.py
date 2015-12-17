@@ -411,19 +411,26 @@ class ParserTest(unittest.TestCase):
     def testSelectAny(self):
         self.assertQueryMatches(
             "SELECT ANY FROM pslist()",
-            ast.Any(ast.Apply(ast.Var("pslist")), ast.Literal(True)))
+            ast.Any(ast.Apply(ast.Var("pslist"))))
 
         # Shorthands for any should work.
         self.assertQueryMatches(
             "SELECT ANY FROM pslist()",
-            ast.Any(ast.Apply(ast.Var("pslist")), ast.Literal(True)))
+            ast.Any(ast.Apply(ast.Var("pslist"))))
 
         self.assertQueryMatches(
             "ANY pslist()",
-            ast.Any(ast.Apply(ast.Var("pslist")), ast.Literal(True)))
+            ast.Any(ast.Apply(ast.Var("pslist"))))
 
         # Any doesn't allow ORDER BY.
         self.assertQueryRaises("SELECT ANY FROM pslist() ORDER BY pid")
+
+    def testAnyBuiltin(self):
+        self.assertQueryMatches(
+            "any(x) and any(y)",
+            ast.Intersection(
+                ast.Any(ast.Var("x")),
+                ast.Any(ast.Var("y"))))
 
     def testSelectAnyWhere(self):
         self.assertQueryMatches(
