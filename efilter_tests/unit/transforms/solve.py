@@ -251,7 +251,7 @@ class SolveTest(testlib.EfilterTestCase):
         )
 
     def testFilter(self):
-        self.assertEqual(
+        self.assertValuesEqual(
             solve.solve(
                 q.Query("select * from Process where (pid == 1)"),
                 {"Process": repeated.meld(

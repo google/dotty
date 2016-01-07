@@ -15,7 +15,7 @@
 # limitations under the License.
 
 """
-EFILTER type system.
+Implements IRepeated using a list container.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"

@@ -82,6 +82,26 @@ def meld(*values):
 
 
 @dispatch.multimethod
+def lazy(generator_func):
+    """Return a lazy repeated value of 'generator_func', which must be stable.
+
+    For large datasets, it's useful to use lazy repeated values, because they
+    avoid storing all the values of the repetition in memory.
+
+    EFILTER ships a default implementation of this multimethod found in
+    efilter.ext.lazy_repetition.
+
+    Arguments:
+        generator_func: A function that returns a generator of the values that
+            constitute this repeated value.
+
+            IMPORTANT: This function MUST be stable, meaning the values in the
+            generator MUST be the same each time the function is called.
+    """
+    raise NotImplementedError()
+
+
+@dispatch.multimethod
 def getvalues(x):
     """Return a collection of the values of x."""
     raise NotImplementedError()

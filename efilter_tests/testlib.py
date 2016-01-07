@@ -24,6 +24,8 @@ import unittest
 
 from efilter import protocol
 
+from efilter.protocols import repeated
+
 # When messing around with the AST it can be handy to get the coverage tests
 # to shut up temporarily.
 TEST_COVERAGE = True
@@ -37,3 +39,6 @@ class EfilterTestCase(unittest.TestCase):
 
     def assertIsa(self, t, p):
         self.assertTrue(protocol.isa(t, p), "%r is not type %r." % (t, p))
+
+    def assertValuesEqual(self, x, y):
+        self.assertItemsEqual(repeated.getvalues(x), repeated.getvalues(y))

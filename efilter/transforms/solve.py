@@ -285,16 +285,16 @@ def solve(expr, vars):
     """
     lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
 
-    try:
-        results = []
-        for lhs_value in repeated.getvalues(lhs_values):
-            nested_scope = scope.ScopeStack(vars, lhs_value)
-            results.append(solve(expr.rhs, nested_scope).value)
-    except errors.EfilterNoneError as error:
-        error.root = expr
-        raise
+    def _generator():
+        try:
+            for lhs_value in repeated.getvalues(lhs_values):
+                nested_scope = scope.ScopeStack(vars, lhs_value)
+                yield solve(expr.rhs, nested_scope).value
+        except errors.EfilterNoneError as error:
+            error.root = expr
+            raise
 
-    return Result(repeated.meld(*results), ())
+    return Result(repeated.lazy(_generator), ())
 
 
 @solve.implementation(for_type=ast.Filter)
@@ -305,13 +305,13 @@ def solve(expr, vars):
     """
     lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
 
-    results = []
-    for lhs_value in repeated.getvalues(lhs_values):
-        nested_scope = scope.ScopeStack(vars, lhs_value)
-        if solve(expr.rhs, nested_scope).value:
-            results.append(lhs_value)
+    def _generator():
+        for lhs_value in repeated.getvalues(lhs_values):
+            nested_scope = scope.ScopeStack(vars, lhs_value)
+            if solve(expr.rhs, nested_scope).value:
+                yield lhs_value
 
-    return Result(repeated.meld(*results), ())
+    return Result(repeated.lazy(_generator), ())
 
 
 @solve.implementation(for_type=ast.Sort)
@@ -504,7 +504,7 @@ def solve(expr, vars):
     children = iter(expr.children)
     first_value = solve(next(children), vars).value
     for child in children:
-        if solve(child, vars).value != first_value:
+        if not repeated.value_eq(solve(child, vars).value, first_value):
             return Result(False, ())
 
     return Result(True, ())

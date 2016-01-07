@@ -20,26 +20,26 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import unittest
+from efilter_tests import testlib
 
 from efilter import api
 
 
-class QueryTest(unittest.TestCase):
+class QueryTest(testlib.EfilterTestCase):
     def testApply(self):
-        self.assertEqual(
+        self.assertValuesEqual(
             api.apply("select age from data where name == 'Peter'",
                       data=[dict(name="Peter", age=20),
                             dict(name="Paul", age=30)]),
             dict(age=20))
 
-        self.assertEqual(
+        self.assertValuesEqual(
             api.apply("select * from data where name == 'Peter'",
                       data=[dict(name="Peter", age=20),
                             dict(name="Paul", age=30)]),
             dict(age=20, name="Peter"))
 
-        self.assertEqual(
+        self.assertValuesEqual(
             api.apply("select * from data where name == ?",
                       data=[dict(name="Peter", age=20),
                             dict(name="Paul", age=30)],
