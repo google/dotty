@@ -23,6 +23,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 import unittest
 
 from efilter.ext import lazy_repetition
+
 from efilter.protocols import repeated
 
 

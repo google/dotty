@@ -45,6 +45,13 @@ class StdlibIntegrationTest(unittest.TestCase):
         # Lists are not.
         self.assertEqual(api.apply("count([1, [2, 3]])"), 2)
 
+    def testCountFilter(self):
+        self.assertEqual(
+            api.apply("count(select * from people where age > 20)",
+                      people=[{"age": 10}, {"age": 30}, {"age": 15},
+                              {"age": 35}]),
+            2)
+
     def testReverseLists(self):
         """Test that reverse supports both lists and IRepeted."""
         # "lists" are actually Python tuples.

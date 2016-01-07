@@ -20,6 +20,7 @@ Implements IRepeated using a restartable generator.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+from efilter.protocols import counted
 from efilter.protocols import repeated
 
 
@@ -34,7 +35,11 @@ class LazyRepetition(object):
 
     _generator_func = None
     _value_type = None  # Just a cache for value_type.
-    _watermark = 0
+    _watermark = 0  # Highest idx reached so far.
+
+    # The count of values. After first complete iteration this will be one
+    # higher than watermark.
+    _count = None  
 
     def __init__(self, generator_func):
         if not callable(generator_func):
@@ -84,6 +89,19 @@ class LazyRepetition(object):
                 " idx %d! Generator function %r is not stable." %
                 (self, self._watermark, idx + 1, self._generator_func))
 
+        # Watermark is higher than previous count! Generator function returned
+        # more values this time than last time.
+        if self._count is not None and self._watermark >= self._count:
+            raise ValueError(
+                "LazyRepetition %r previously iterated only up to idx %d but"
+                " was now able to reach idx %d! Generator function %r is not"
+                " stable." %
+                (self, self._count - 1, idx + 1, self._generator_func))
+
+        # We've finished iteration - cache count. After this the count will be
+        # watermark + 1 forever.
+        self._count = self._watermark + 1
+
     def value_type(self):
         if self._value_type is None:
             for value in self.getvalues():
@@ -108,6 +126,17 @@ class LazyRepetition(object):
 
         return LazyRepetition(_generator)
 
+    # ICounted implementation:
+
+    def count(self):
+        if not self._count:
+            # Do a complete pass over the generator to cause _count to be set.
+            for _ in self.getvalues():
+                pass
+
+        return self._count
+
 
 repeated.IRepeated.implicit_static(LazyRepetition)
 repeated.lazy.implement(for_type=object, implementation=LazyRepetition)
+counted.ICounted.implicit_static(LazyRepetition)
