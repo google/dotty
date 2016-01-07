@@ -25,7 +25,7 @@ from efilter import ast
 from efilter import syntax
 from efilter import query as q
 
-from efilter.parsers.experiments.dottysql import grammar
+from efilter.parsers.dottysql import grammar
 
 
 def __build_operator_lookup(table):

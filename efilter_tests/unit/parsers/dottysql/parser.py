@@ -25,7 +25,7 @@ import unittest
 from efilter import ast
 from efilter import errors
 
-from efilter.parsers.experiments.dottysql import parser
+from efilter.parsers.dottysql import parser
 
 
 class ParserTest(unittest.TestCase):

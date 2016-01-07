@@ -25,7 +25,7 @@ import collections
 from efilter import ast
 from efilter import errors
 
-from efilter.parsers.experiments.dottysql import ast_transforms as transforms
+from efilter.parsers.dottysql import ast_transforms as transforms
 
 
 class Operator(collections.namedtuple(

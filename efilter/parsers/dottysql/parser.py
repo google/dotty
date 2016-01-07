@@ -62,8 +62,8 @@ from efilter import ast
 from efilter import errors
 from efilter import syntax
 
-from efilter.parsers.experiments.dottysql import grammar
-from efilter.parsers.experiments.dottysql import lexer
+from efilter.parsers.dottysql import grammar
+from efilter.parsers.dottysql import lexer
 
 
 class Parser(syntax.Syntax):
@@ -531,6 +531,9 @@ class Parser(syntax.Syntax):
             return sort_expression
 
         if self.accept(grammar.select_desc):
+            # Descending sort uses the stdlib function 'reverse' on the sorted
+            # results. Standard library's core functions should ALWAYS be
+            # available.
             return ast.Apply(
                 ast.Var("reverse",
                         start=sort_expression.start,

@@ -22,7 +22,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import unittest
 
-from efilter.parsers.experiments.dottysql import lexer
+from efilter.parsers.dottysql import lexer
 
 
 class LexerTest(unittest.TestCase):

@@ -53,7 +53,7 @@ class StdlibIntegrationTest(unittest.TestCase):
             2)
 
     def testReverseLists(self):
-        """Test that reverse supports both lists and IRepeted."""
+        """Test that reverse supports both lists and IRepeated."""
         # "lists" are actually Python tuples.
         self.assertEqual(api.apply("reverse([1, 2, 3])"), (3, 2, 1))
 

@@ -39,7 +39,6 @@ from efilter.protocols import boolean
 from efilter.protocols import iset
 from efilter.protocols import number
 from efilter.protocols import ordered
-from efilter.protocols import reflective
 from efilter.protocols import repeated
 from efilter.protocols import structured
 
@@ -377,7 +376,7 @@ def solve(expr, vars):
 def solve(expr, vars):
     """Typecheck whether LHS is type on the RHS."""
     lhs = solve(expr.lhs, vars)
-    t = reflective.reflect(type(vars), expr.rhs)
+    t = structured.reflect(vars, expr.rhs)
     return Result(protocol.implements(lhs.value, t), ())
 
 

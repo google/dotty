@@ -22,7 +22,6 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import ast
 
-from efilter.transforms import asdotty
 from efilter.transforms import asdottysql
 from efilter.transforms import aslisp
 from efilter.transforms import infer_type
@@ -45,9 +44,6 @@ class TransformCoverageTest(testlib.EfilterTestCase):
                     not getattr(cls, "_%s__abstract" % cls.__name__, None)):
 
                 self.assertImplemented(function=function, for_type=cls)
-
-    def testAsDottyCoverage(self):
-        self.assertASTCoverage(asdotty.asdotty)
 
     def testAsDottySQLCoverage(self):
         self.assertASTCoverage(asdottysql.asdottysql)
