@@ -425,6 +425,21 @@ class ParserTest(unittest.TestCase):
         # Any doesn't allow ORDER BY.
         self.assertQueryRaises("SELECT ANY FROM pslist() ORDER BY pid")
 
+    def testSelectLimit(self):
+        self.assertQueryMatches(
+            "SELECT * FROM pslist LIMIT 10",
+            ast.Apply(ast.Var("take"), ast.Literal(10), ast.Var("pslist")))
+
+        self.assertQueryMatches(
+            "SELECT * FROM pslist LIMIT 10 OFFSET 5",
+            ast.Apply(
+                ast.Var("take"),
+                ast.Literal(10),
+                ast.Apply(
+                    ast.Var("drop"),
+                    ast.Literal(5),
+                    ast.Var("pslist"))))
+
     def testAnyBuiltin(self):
         self.assertQueryMatches(
             "any(x) and any(y)",
@@ -460,6 +475,61 @@ class ParserTest(unittest.TestCase):
                     ast.Pair(
                         ast.Literal(2),
                         ast.Literal("foo")))))
+
+    def testFullSelect(self):
+        query = ("SELECT proc.parent.pid AS ppid, proc.pid"
+                 " FROM pslist(pid: 10, ppid: 20)"
+                 " WHERE count(proc.open_files) > 10"
+                 " ORDER BY proc.command DESC"
+                 " LIMIT 10 - 9 OFFSET add(5, 10)")
+
+        expected = ast.Map(
+            ast.Apply(
+                ast.Var("take"),
+                ast.Difference(ast.Literal(10), ast.Literal(9)),
+                ast.Apply(
+                    ast.Var("drop"),
+                    ast.Apply(
+                        ast.Var("add"),
+                        ast.Literal(5),
+                        ast.Literal(10)),
+                    ast.Apply(
+                        ast.Var("reverse"),
+                        ast.Sort(
+                            ast.Filter(
+                                ast.Apply(
+                                    ast.Var("pslist"),
+                                    ast.Pair(
+                                        ast.Var("pid"),
+                                        ast.Literal(10)),
+                                    ast.Pair(
+                                        ast.Var("ppid"),
+                                        ast.Literal(20))),
+                                ast.StrictOrderedSet(
+                                    ast.Apply(
+                                        ast.Var("count"),
+                                        ast.Resolve(
+                                            ast.Var("proc"),
+                                            ast.Literal("open_files"))),
+                                    ast.Literal(10))),
+                            ast.Resolve(
+                                ast.Var("proc"),
+                                ast.Literal("command")))))),
+            ast.Bind(
+                ast.Pair(
+                    ast.Literal("ppid"),
+                    ast.Resolve(
+                        ast.Resolve(
+                            ast.Var("proc"),
+                            ast.Literal("parent")),
+                        ast.Literal("pid"))),
+                ast.Pair(
+                    ast.Literal("pid"),
+                    ast.Resolve(
+                        ast.Var("proc"),
+                        ast.Literal("pid")))))
+
+        self.assertQueryMatches(query, expected)
 
     def testComplexSelect(self):
         query = ("(SELECT proc.parent.pid AS ppid, proc.pid FROM pslist(10) "

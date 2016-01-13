@@ -509,6 +509,9 @@ class Parser(syntax.Syntax):
         if self.accept(grammar.select_order):
             return self.select_order(source_expression)
 
+        if self.accept(grammar.select_limit):
+            return self.select_limit(source_expression)
+
         return source_expression
 
     def select_where(self, source_expression):
@@ -518,6 +521,9 @@ class Parser(syntax.Syntax):
 
         if self.accept(grammar.select_order):
             return self.select_order(filter_expression)
+
+        if self.accept(grammar.select_limit):
+            return self.select_limit(filter_expression)
 
         return filter_expression
 
@@ -534,7 +540,7 @@ class Parser(syntax.Syntax):
             # Descending sort uses the stdlib function 'reverse' on the sorted
             # results. Standard library's core functions should ALWAYS be
             # available.
-            return ast.Apply(
+            sort_expression = ast.Apply(
                 ast.Var("reverse",
                         start=sort_expression.start,
                         end=self.matched_end),
@@ -542,7 +548,43 @@ class Parser(syntax.Syntax):
                 start=sort_expression.start,
                 end=self.matched_end)
 
+        if self.accept(grammar.select_limit):
+            return self.select_limit(sort_expression)
+
         return sort_expression
+
+    def select_limit(self, source_expression):
+        """Match LIMIT take [OFFSET drop]."""
+        start = self.matched_start
+
+        # The expression right after LIMIT is the count to take.
+        limit_count_expression = self.expression()
+
+        # Optional OFFSET follows.
+        if self.accept(grammar.select_offset):
+            offset_start = self.matched_start
+            offset_end = self.matched_end
+
+            # Next thing is the count to drop.
+            offset_count_expression = self.expression()
+
+            # We have a new source expression, which is drop(count, original).
+            offset_source_expression = ast.Apply(
+                ast.Var("drop", start=offset_start, end=offset_end),
+                offset_count_expression,
+                source_expression,
+                start=offset_start, end=offset_count_expression.end)
+
+            # Drop before taking, because obviously.
+            source_expression = offset_source_expression
+
+        limit_expression = ast.Apply(
+            ast.Var("take", start=start, end=limit_count_expression.end),
+            limit_count_expression,
+            source_expression,
+            start=start, end=self.matched_end)
+
+        return limit_expression
 
     # Builtin pseudo-function application subgrammar.
 

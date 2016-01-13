@@ -219,8 +219,12 @@ PREFIX = collections.OrderedDict([
 ])
 
 
-SQL_KEYWORDS = frozenset([
-    "SELECT", "FROM", "ANY", "WHERE", "DESC", "ASC", "ORDER BY"
+# These keywords are not allowed outside of the SELECT expression. They are not
+# the full list of SQL keywords (for example LIMIT and OFFSET are not included),
+# just ones that will be rejected by the parser unless they follow in proper
+# order after SELECT.
+SQL_RESERVED_KEYWORDS = frozenset([
+    "SELECT", "FROM", "ANY", "WHERE", "DESC", "ASC", "ORDER BY",
 ])
 
 
@@ -356,6 +360,14 @@ def select_where(tokens):
     return _keyword(tokens, "where")
 
 
+def select_limit(tokens):
+    return _keyword(tokens, "limit")
+
+
+def select_offset(tokens):
+    return _keyword(tokens, "offset")
+
+
 def select_order(tokens):
     return _multi_keyword(tokens, ("order", "by"))
 
@@ -369,5 +381,5 @@ def select_desc(tokens):
 
 
 def sql_keyword(tokens):
-    return (_keywords(tokens, SQL_KEYWORDS)
+    return (_keywords(tokens, SQL_RESERVED_KEYWORDS)
             or _multi_keyword(tokens, ("order", "by")))

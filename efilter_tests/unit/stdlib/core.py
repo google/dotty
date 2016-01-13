@@ -20,14 +20,59 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import unittest
+from efilter_tests import testlib
 
 from efilter.protocols import repeated
 
 from efilter.stdlib import core
 
 
-class CoreTest(unittest.TestCase):
+class CoreTest(testlib.EfilterTestCase):
+    def testTake(self):
+        self.assertValuesEqual(
+            core.Take()(2, repeated.meld(1, 2, 3, 4)),
+            repeated.meld(1, 2))
+
+        # Also should support tuples.
+        self.assertValuesEqual(
+            core.Take()(2, (1, 2, 3, 4)),
+            repeated.meld(1, 2))
+
+        # Exceeding the bounds is fine.
+        self.assertValuesEqual(
+            core.Take()(10, (1, 2, 3)),
+            repeated.meld(1, 2, 3))
+
+        # Taking zero.
+        self.assertValuesEqual(
+            core.Take()(0, (1, 2, 3)),
+            None)
+
+        # Taking from empty.
+        self.assertValuesEqual(
+            core.Take()(10, ()),
+            None)
+
+    def testDrop(self):
+        self.assertValuesEqual(
+            core.Drop()(2, repeated.meld(1, 2, 3, 4)),
+            repeated.meld(3, 4))
+
+        # Also should support tuples.
+        self.assertValuesEqual(
+            core.Drop()(2, (1, 2, 3, 4)),
+            repeated.meld(3, 4))
+
+        # Exceeding bounds is fine.
+        self.assertValuesEqual(
+            core.Drop()(10, (1, 2, 3)),
+            None)
+
+        # Dropping zero.
+        self.assertValuesEqual(
+            core.Drop()(0, (1, 2, 3)),
+            repeated.meld(1, 2, 3))
+
     def testCount(self):
         self.assertEquals(
             core.Count()(repeated.meld(1, 2, 3, 4)),

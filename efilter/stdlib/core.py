@@ -51,6 +51,90 @@ class TypedFunction(object):
 applicative.IApplicative.implicit_dynamic(TypedFunction)
 
 
+class Take(TypedFunction):
+    """Takes only the first 'count' elements from 'x' (tuple or IRepeated).
+
+    This implementation is lazy.
+
+    Example:
+        take(2, (1, 2, 3, 4)) -> (1, 2)
+
+    Arguments:
+        count: How many elements to return.
+        x: The tuple or IRepeated to take from.
+
+    Returns:
+        A lazy IRepeated.
+    """
+
+    name = "take"
+
+    def __call__(self, count, x):
+        def _generator():
+            if isinstance(x, tuple):
+                values = x
+            else:
+                values = repeated.getvalues(x)
+
+            for idx, value in enumerate(values):
+                if idx == count:
+                    break
+
+                yield value
+
+        return repeated.lazy(_generator)
+
+    @classmethod
+    def reflect_static_args(cls):
+        return (int, repeated.IRepeated)
+
+    @classmethod
+    def reflect_static_return(cls):
+        return repeated.IRepeated
+
+
+class Drop(TypedFunction):
+    """Drops the first 'count' elements from 'x' (tuple or IRepeated).
+
+    This implementation is lazy.
+
+    Example:
+        drop(2, (1, 2, 3, 4)) -> (3, 4)
+
+    Arguments:
+        count: How many elements to drop.
+        x: The tuple or IRepeated to drop from.
+
+    Returns:
+        A lazy IRepeated.
+    """
+
+    name = "drop"
+
+    def __call__(self, count, x):
+        def _generator():
+            if isinstance(x, tuple):
+                values = x
+            else:
+                values = repeated.getvalues(x)
+
+            for idx, value in enumerate(values):
+                if idx < count:
+                    continue
+
+                yield value
+
+        return repeated.lazy(_generator)
+
+    @classmethod
+    def reflect_static_args(cls):
+        return (int, repeated.IRepeated)
+
+    @classmethod
+    def reflect_static_return(cls):
+        return repeated.IRepeated
+
+
 class Lower(TypedFunction):
     """Makes a string lowercase."""
 
@@ -105,4 +189,5 @@ class Reverse(TypedFunction):
         return repeated.IRepeated
 
 
-FUNCTIONS = dict(count=Count(), reverse=Reverse(), lower=Lower())
+FUNCTIONS = dict(take=Take(), drop=Drop(), count=Count(), reverse=Reverse(),
+                 lower=Lower())

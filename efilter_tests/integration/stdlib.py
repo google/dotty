@@ -20,17 +20,33 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import unittest
+from efilter_tests import testlib
 
 from efilter import api
 
 from efilter.protocols import repeated
 
 
-class StdlibIntegrationTest(unittest.TestCase):
+class StdlibIntegrationTest(testlib.EfilterTestCase):
     def testFuncCalls(self):
         """Test that function calls are completed."""
         self.assertEqual(api.apply("count((1, 2, 3))"), 3)
+
+    def testDropAndTake(self):
+        """Test that dropping and taking works properly."""
+        self.assertValuesEqual(
+            api.apply("drop(2, (1, 2, 3, 4))"),
+            repeated.meld(3, 4))
+
+        self.assertValuesEqual(
+            api.apply("drop(3, (1, 2, 3, 4))"), 4)
+
+        self.assertValuesEqual(
+            api.apply("take(1, drop(2, (1, 2, 3, 4)))"), 3)
+
+        # Alternate syntax to do the same thing.
+        self.assertValuesEqual(
+            api.apply("SELECT * FROM (1, 2, 3, 4) LIMIT 1 OFFSET 2"), 3)
 
     def testCountLists(self):
         """Test that count supports lists and IRepeated."""
