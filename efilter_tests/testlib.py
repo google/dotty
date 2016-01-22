@@ -20,15 +20,21 @@ EFILTER test helpers.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import os
 import unittest
 
 from efilter import protocol
 
 from efilter.protocols import repeated
 
+
 # When messing around with the AST it can be handy to get the coverage tests
 # to shut up temporarily.
 TEST_COVERAGE = True
+
+
+def get_fixture_path(name):
+    return os.path.join("efilter_tests", "fixtures", name)
 
 
 class EfilterTestCase(unittest.TestCase):

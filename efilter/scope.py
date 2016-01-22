@@ -28,7 +28,7 @@ from efilter.protocols import structured
 class ScopeStack(object):
     """Stack of IStructured scopes from global to local.
 
-    Members:
+    Arguments:
         scopes: A flat list of scopes from local (idx -1) to global (idx 0).
             Note that ScopeStackStack instances passed to the constructor are
             flattened.

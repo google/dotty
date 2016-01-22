@@ -19,7 +19,7 @@ done
 
 echo "Working directory is $(pwd)"
 
-echo "Going to run pylint and autopep8 now."
+echo "Going to run pylint and autopep8 now..."
 for f in $( git diff master --name-only | grep ".py"); do
   if [ -e $f ]; then
     echo "Validating and reformatting $f"
@@ -28,6 +28,9 @@ for f in $( git diff master --name-only | grep ".py"); do
   fi
 done
 
-
+echo "Running unittest discover on efilter_tests..."
 # Run the unit test suite.
 python -m unittest discover efilter_tests -p "*"
+
+# Run the benchmarks.
+PYTHONPATH=./ efilter_tests/run_benchmarks.py

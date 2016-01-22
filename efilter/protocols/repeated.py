@@ -88,7 +88,7 @@ def lazy(generator_func):
     For large datasets, it's useful to use lazy repeated values, because they
     avoid storing all the values of the repetition in memory.
 
-    EFILTER ships a default implementation of this multimethod found in
+    EFILTER ships a default implementation of this multimethod, found in
     efilter.ext.lazy_repetition.
 
     Arguments:
@@ -97,6 +97,19 @@ def lazy(generator_func):
 
             IMPORTANT: This function MUST be stable, meaning the values in the
             generator MUST be the same each time the function is called.
+    """
+    raise NotImplementedError()
+
+
+@dispatch.multimethod
+def lines(fd):
+    """Return a lazy repeated value of lines in 'fd' which is a File object.
+
+    EFILTER ships a default implementation of this multimethod, found in
+    efilter.ext.line_reader.
+
+    Argument:
+        fd: A File object that represents a text file.
     """
     raise NotImplementedError()
 

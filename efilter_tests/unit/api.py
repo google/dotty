@@ -29,20 +29,20 @@ class QueryTest(testlib.EfilterTestCase):
     def testApply(self):
         self.assertValuesEqual(
             api.apply("select age from data where name == 'Peter'",
-                      data=[dict(name="Peter", age=20),
-                            dict(name="Paul", age=30)]),
+                      vars=dict(data=[dict(name="Peter", age=20),
+                                      dict(name="Paul", age=30)])),
             dict(age=20))
 
         self.assertValuesEqual(
             api.apply("select * from data where name == 'Peter'",
-                      data=[dict(name="Peter", age=20),
-                            dict(name="Paul", age=30)]),
+                      vars=dict(data=[dict(name="Peter", age=20),
+                                      dict(name="Paul", age=30)])),
             dict(age=20, name="Peter"))
 
         self.assertValuesEqual(
             api.apply("select * from data where name == ?",
-                      data=[dict(name="Peter", age=20),
-                            dict(name="Paul", age=30)],
+                      vars=dict(data=[dict(name="Peter", age=20),
+                                      dict(name="Paul", age=30)]),
                       replacements=["Peter"]),
             dict(age=20, name="Peter"))
 

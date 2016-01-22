@@ -36,5 +36,5 @@ class ICounted(protocol.Protocol):
 
 # Default implementations:
 
-ICounted.implement(for_types=(list, tuple, set, frozenset, dict),
+ICounted.implement(for_types=(list, tuple, set, frozenset, dict, basestring),
                    implementations={count: len})

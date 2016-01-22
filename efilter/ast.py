@@ -49,8 +49,10 @@ class Expression(object):
 
     children = ()
     arity = 0
-    start = None
-    end = None
+
+    start = None  # Start of the expression's source code in 'source'.
+    end = None  # End of the expression's source code in 'source'.
+    source = None  # The source code of the query this expression belongs to.
 
     type_signature = (protocol.AnyType,)
     return_signature = protocol.AnyType
@@ -69,6 +71,7 @@ class Expression(object):
 
         self.start = kwargs.pop("start", None)
         self.end = kwargs.pop("end", None)
+        self.source = kwargs.pop("source", None)
 
         if kwargs:
             raise ValueError("Unexpected argument(s) %s" % kwargs.keys())

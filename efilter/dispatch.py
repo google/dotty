@@ -53,13 +53,13 @@ def call_audit(func):
         import traceback
         stack = traceback.extract_stack()
         r = func(*args, **kwargs)
-        print "@depth %d, trace %s -> %s(*%r, **%r) => %r" % (
+        print("@depth %d, trace %s -> %s(*%r, **%r) => %r" % (
             len(stack),
             " -> ".join("%s:%d:%s" % x[0:3] for x in stack[-5:-2]),
             func.func_name,
             args,
             kwargs,
-            r)
+            r))
         return r
 
     return audited_func

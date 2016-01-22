@@ -82,7 +82,7 @@ class Lexer(object):
                 r"\{(?P<token>[a-z_0-9]*)\}", "emit_param", None),
         Pattern("param", ("INITIAL,"), r"(?P<token>\?)", "emit_param", None),
 
-        # Numberic literals.
+        # Numeric literals.
         Pattern("literal", ("INITIAL,"),
                 r"(?P<token>\d+\.\d+)", "emit_float", None),
         Pattern("literal", ("INITIAL,"),

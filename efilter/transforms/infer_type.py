@@ -31,7 +31,6 @@ from efilter.stdlib import core as std_core
 
 from efilter.protocols import applicative
 from efilter.protocols import associative
-from efilter.protocols import boolean
 from efilter.protocols import structured
 
 
@@ -60,6 +59,12 @@ def infer_type(expr, scope=None):
 
 @infer_type.implementation(for_type=q.Query)
 def infer_type(query, scope=None):
+    # Always include stdcore at the top level.
+    if scope:
+        scope = s.ScopeStack(std_core.FUNCTIONS, scope)
+    else:
+        scope = s.ScopeStack(std_core.FUNCTIONS)
+
     try:
         return infer_type(query.root, scope)
     except errors.EfilterError as error:
@@ -83,6 +88,7 @@ def infer_type(expr, scope):
 
 @infer_type.implementation(for_type=ast.Complement)
 def infer_type(expr, scope):
+    _ = expr, scope
     return bool
 
 

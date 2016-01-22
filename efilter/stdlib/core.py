@@ -15,7 +15,11 @@
 # limitations under the License.
 
 """
-EFILTER stdlib.
+EFILTER stdlib - core module.
+
+This module defines functions that are always included in every query, as well
+as the base classes TypedFunction and LibraryModule, which are used to represent
+stdlib functions and modules.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
@@ -28,6 +32,7 @@ from efilter import protocol
 from efilter.protocols import applicative
 from efilter.protocols import counted
 from efilter.protocols import repeated
+from efilter.protocols import structured
 
 
 class TypedFunction(object):
@@ -49,6 +54,25 @@ class TypedFunction(object):
 
 
 applicative.IApplicative.implicit_dynamic(TypedFunction)
+
+
+class LibraryModule(object):
+    functions = None
+
+    def __init__(self, functions):
+        self.functions = functions
+
+    def getmembers_runtime(self):
+        return self.functions.keys()
+
+    def resolve(self, name):
+        return self.functions[name]
+
+    def reflect_runtime_member(self, name):
+        return type(self.resolve(name))
+
+
+structured.IStructured.implicit_static(LibraryModule)
 
 
 class Take(TypedFunction):
@@ -189,5 +213,5 @@ class Reverse(TypedFunction):
         return repeated.IRepeated
 
 
-FUNCTIONS = dict(take=Take(), drop=Drop(), count=Count(), reverse=Reverse(),
-                 lower=Lower())
+FUNCTIONS = LibraryModule(dict(take=Take(), drop=Drop(), count=Count(),
+                               reverse=Reverse(), lower=Lower()))

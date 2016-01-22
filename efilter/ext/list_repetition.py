@@ -47,6 +47,9 @@ class ListRepetition(object):
                     (self.value_type(), value, repeated.value_type(value)))
             self.add_value(value)
 
+    def __iter__(self):
+        return iter(self._delegate)
+
     def add_value(self, value):
         """Add a value to this repeated var.
 

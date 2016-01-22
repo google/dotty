@@ -39,13 +39,26 @@ class LazyRepetition(object):
 
     # The count of values. After first complete iteration this will be one
     # higher than watermark.
-    _count = None  
+    _count = None
 
     def __init__(self, generator_func):
         if not callable(generator_func):
             raise TypeError("Generator function must be callable.")
 
         self._generator_func = generator_func
+
+    def __eq__(self, other):
+        if not isinstance(other, repeated.IRepeated):
+            return False
+
+        return self.value_eq(other)
+
+    def __iter__(self):
+        return self._generator_func()
+
+    def __repr__(self):
+        return "LazyRepetition(generator_func=%r, value_type=%r)" % (
+            self._generator_func, self.value_type())
 
     # IRepeated protocol implementation (see IRepeated for behavior docs).
 
@@ -112,12 +125,6 @@ class LazyRepetition(object):
 
     def value_eq(self, other):
         return sorted(self.getvalues()) == sorted(repeated.getvalues(other))
-
-    def __eq__(self, other):
-        if not isinstance(other, repeated.IRepeated):
-            return False
-
-        return self.value_eq(other)
 
     def value_apply(self, f):
         def _generator():

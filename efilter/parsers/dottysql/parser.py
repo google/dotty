@@ -253,10 +253,11 @@ class Parser(syntax.Syntax):
             operator = self.matched_operator
             start = self.matched_start
             expr = self.expression(operator.precedence)
-            return operator.handler(expr, start=start, end=expr.end)
+            return operator.handler(expr, start=start, end=expr.end,
+                                    source=self.original)
 
         if self.accept(grammar.literal):
-            return ast.Literal(self.matched_value,
+            return ast.Literal(self.matched_value, source=self.original,
                                start=self.matched_start, end=self.matched_end)
 
         # Match builtin pseudo-functions before functions and vars to prevent
@@ -267,11 +268,11 @@ class Parser(syntax.Syntax):
         # Match applications before vars, because obviously.
         if self.accept(grammar.application):
             return self.application(
-                ast.Var(self.matched_value,
+                ast.Var(self.matched_value, source=self.original,
                         start=self.matched_start, end=self.matched_end))
 
         if self.accept(grammar.symbol):
-            return ast.Var(self.matched_value,
+            return ast.Var(self.matched_value, source=self.original,
                            start=self.matched_start, end=self.matched_end)
 
         if self.accept(grammar.lparen):
@@ -292,7 +293,7 @@ class Parser(syntax.Syntax):
             if len(expressions) == 1:
                 return expressions[0]
             else:
-                return ast.Repeat(*expressions,
+                return ast.Repeat(*expressions, source=self.original,
                                   start=start, end=self.matched_end)
 
         if self.accept(grammar.lbracket):
@@ -321,7 +322,7 @@ class Parser(syntax.Syntax):
                 start_token=self.matched_tokens[0])
 
         return ast.Literal(self.params[param], start=self.matched_start,
-                           end=self.matched_end)
+                           end=self.matched_end, source=self.original)
 
     def accept_operator(self, precedence):
         """Accept the next binary operator only if it's of higher precedence."""
@@ -381,7 +382,8 @@ class Parser(syntax.Syntax):
                     break
                 rhs = self.operator(rhs, self.matched_operator.precedence)
 
-            lhs = operator.handler(lhs, rhs, start=lhs.start, end=rhs.end)
+            lhs = operator.handler(lhs, rhs, start=lhs.start, end=rhs.end,
+                                   source=self.original)
 
         return lhs
 
@@ -393,7 +395,7 @@ class Parser(syntax.Syntax):
         """
         self.expect(grammar.symbol)
         return ast.Literal(self.matched_value, start=self.matched_start,
-                           end=self.matched_end)
+                           end=self.matched_end, source=self.original)
 
     # SQL subgrammar:
 
@@ -438,9 +440,11 @@ class Parser(syntax.Syntax):
 
         if map_expression:
             return ast.Any(source_expression, map_expression,
-                           start=start, end=map_expression.end)
+                           start=start, end=map_expression.end,
+                           source=self.original)
 
-        return ast.Any(source_expression, start=start, end=self.matched_end)
+        return ast.Any(source_expression, start=start, end=self.matched_end,
+                       source=self.original)
 
     def _guess_name_of(self, expr):
         """Tries to guess what variable name 'expr' ends in."""
@@ -471,7 +475,8 @@ class Parser(syntax.Syntax):
 
                 key_expression = ast.Literal(self.matched_value,
                                              start=self.matched_start,
-                                             end=self.matched_wide_end)
+                                             end=self.matched_wide_end,
+                                             source=self.original)
                 used_names.add(self.matched_value)
             else:
                 # If the value expression is a map of var (x.y.z...) then
@@ -488,16 +493,19 @@ class Parser(syntax.Syntax):
 
             end = key_expression.end or value_expression.end
             vars.append(ast.Pair(key_expression, value_expression,
-                                 start=value_expression.start, end=end))
+                                 start=value_expression.start, end=end,
+                                 source=self.original))
 
             if self.accept(grammar.select_from):
                 # Make ast.Bind here.
                 source_expression = self.select_from()
                 return ast.Map(
                     source_expression,
-                    ast.Bind(*vars, start=start, end=vars[-1].end),
+                    ast.Bind(*vars, start=start, end=vars[-1].end,
+                             source=self.original),
                     start=start,
-                    end=self.matched_end)
+                    end=self.matched_end,
+                    source=self.original)
 
             self.expect(grammar.comma)
 
@@ -517,7 +525,8 @@ class Parser(syntax.Syntax):
     def select_where(self, source_expression):
         start = self.matched_start
         filter_expression = ast.Filter(source_expression, self.expression(),
-                                       start=start, end=self.matched_end)
+                                       start=start, end=self.matched_end,
+                                       source=self.original)
 
         if self.accept(grammar.select_order):
             return self.select_order(filter_expression)
@@ -530,7 +539,8 @@ class Parser(syntax.Syntax):
     def select_order(self, source_expression):
         start = self.matched_start
         sort_expression = ast.Sort(source_expression, self.expression(),
-                                   start=start, end=self.matched_end)
+                                   start=start, end=self.matched_end,
+                                   source=self.original)
 
         if self.accept(grammar.select_asc):
             sort_expression.end = self.matched_end
@@ -543,10 +553,15 @@ class Parser(syntax.Syntax):
             sort_expression = ast.Apply(
                 ast.Var("reverse",
                         start=sort_expression.start,
-                        end=self.matched_end),
+                        end=self.matched_end,
+                        source=self.original),
                 sort_expression,
                 start=sort_expression.start,
-                end=self.matched_end)
+                end=self.matched_end,
+                source=self.original)
+
+        if self.accept(grammar.select_limit):
+            return self.select_limit(sort_expression)
 
         if self.accept(grammar.select_limit):
             return self.select_limit(sort_expression)
@@ -570,19 +585,22 @@ class Parser(syntax.Syntax):
 
             # We have a new source expression, which is drop(count, original).
             offset_source_expression = ast.Apply(
-                ast.Var("drop", start=offset_start, end=offset_end),
+                ast.Var("drop", start=offset_start, end=offset_end,
+                        source=self.original),
                 offset_count_expression,
                 source_expression,
-                start=offset_start, end=offset_count_expression.end)
+                start=offset_start, end=offset_count_expression.end,
+                source=self.original)
 
             # Drop before taking, because obviously.
             source_expression = offset_source_expression
 
         limit_expression = ast.Apply(
-            ast.Var("take", start=start, end=limit_count_expression.end),
+            ast.Var("take", start=start, end=limit_count_expression.end,
+                    source=self.original),
             limit_count_expression,
             source_expression,
-            start=start, end=self.matched_end)
+            start=start, end=self.matched_end, source=self.original)
 
         return limit_expression
 
@@ -612,7 +630,8 @@ class Parser(syntax.Syntax):
                     keyword, expr_type.arity, len(arguments)),
                 start_token=self.matched_tokens[0])
 
-        return expr_type(*arguments, start=keyword_start, end=self.matched_end)
+        return expr_type(*arguments, start=keyword_start, end=self.matched_end,
+                         source=self.original)
 
     # If-else if-else grammar.
     def if_if(self):
@@ -635,7 +654,8 @@ class Parser(syntax.Syntax):
         else:
             children.append(ast.Literal(None))
 
-        return ast.IfElse(*children, start=start, end=self.matched_end)
+        return ast.IfElse(*children, start=start, end=self.matched_end,
+                          source=self.original)
 
     # Function application subgrammar.
 
@@ -659,14 +679,16 @@ class Parser(syntax.Syntax):
         start = self.matched_start
         if self.accept(grammar.rparen):
             # That was easy.
-            return ast.Apply(func, start=start, end=self.matched_end)
+            return ast.Apply(func, start=start, end=self.matched_end,
+                             source=self.original)
 
         arguments = [self.expression()]
         while self.accept(grammar.comma):
             arguments.append(self.expression())
 
         self.expect(grammar.rparen)
-        return ast.Apply(func, *arguments, start=start, end=self.matched_end)
+        return ast.Apply(func, *arguments, start=start, end=self.matched_end,
+                         source=self.original)
 
     # Tuple grammar.
 
@@ -675,7 +697,8 @@ class Parser(syntax.Syntax):
         start = self.matched_start
 
         if self.accept(grammar.rbracket):
-            return ast.Tuple(start=start, end=self.matched_end)
+            return ast.Tuple(start=start, end=self.matched_end,
+                             source=self.original)
 
         elements = [self.expression()]
 
@@ -683,7 +706,8 @@ class Parser(syntax.Syntax):
             elements.append(self.expression())
 
         self.expect(grammar.rbracket)
-        return ast.Tuple(*elements, start=start, end=self.matched_end)
+        return ast.Tuple(*elements, start=start, end=self.matched_end,
+                         source=self.original)
 
 
 syntax.Syntax.register_parser(Parser, shorthand="dottysql")
