@@ -8,6 +8,9 @@
 *.o
 
 # Specific auto-generated build files
+/.eggs
+/.tox
+/__pycache__
 /py27
 /build
 /dist
