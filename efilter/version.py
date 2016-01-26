@@ -28,7 +28,7 @@ commitish, being output of a hash function, doesn't.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-
+import logging
 import re
 
 try:
@@ -41,7 +41,7 @@ try:
 
     def _unix_epoch(date):
         """Convert datetime object to a UTC UNIX timestamp."""
-        td =  date - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
+        td = date - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
         return int(td.total_seconds())
 
     def run_git_log():
@@ -65,7 +65,10 @@ try:
             # ignores the return code.
             return None
 except ImportError:
+    logging.warn("pytz or dateutil are not available - getting a version "
+                 "number from git won't work.")
     # If there's no dateutil then doing the git tango is pointless.
+
     def run_git_log():
         pass
 

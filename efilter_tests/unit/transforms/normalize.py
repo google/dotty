@@ -62,12 +62,12 @@ class NormalizeTest(testlib.EfilterTestCase):
     def testBinaryExpression(self):
         """Make sure binary expressions are normalized."""
         original = query.Query(
-            ("pair",
+            (":",
                 ("literal", "x"),
                 ("|", ("var", "x"), ("|", ("var", "y"), ("var", "z")))))
 
         expected = query.Query(
-            ("pair",
+            (":",
                 ("literal", "x"),
                 ("|", ("var", "x"), ("var", "y"), ("var", "z"))))
 

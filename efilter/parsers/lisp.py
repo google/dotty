@@ -31,7 +31,6 @@ from efilter import syntax
 EXPRESSIONS = {
     "var": ast.Var,
     "!": ast.Complement,
-    "pair": ast.Pair,
     "select": ast.Select,
     "isa": ast.IsInstance,
     "map": ast.Map,
