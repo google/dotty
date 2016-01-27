@@ -20,13 +20,16 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import unittest
+import six
 
 from efilter.protocols import hashable
 from efilter.protocols import superposition
 
+from efilter_tests import testlib
 
 # Do not try any of this in real code - this is just for sake of tests.
+
+
 class frozendict(dict):
     def __hash__(self):
         return hash(frozenset(self.items()))
@@ -40,7 +43,7 @@ hashable.IHashable.implement(
     implementations={hashable.hashed: _hashed_frozendict})
 
 
-class SuperpositionTest(unittest.TestCase):
+class SuperpositionTest(testlib.EfilterTestCase):
     def assertStateEq(self, s1, s2):
         return self.assertTrue(superposition.state_eq(s1, s2))
 
@@ -71,7 +74,7 @@ class SuperpositionTest(unittest.TestCase):
         # Using meld is sometimes more convenient for this.
         s = superposition.meld("foo", "foo")
         # This object is actually a string.
-        self.assertIsInstance(s, basestring)
+        self.assertIsInstance(s, six.string_types)
         # It can still be manipulated with the superposition-aware protocol,
         # as can any scalar.
         self.assertEqual(s, superposition.getstate(s))

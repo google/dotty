@@ -20,16 +20,19 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import unittest
-
 from efilter.protocols import indexable
 from efilter.ext import indexset
+
+from efilter_tests import testlib
 
 
 class FakeIndexable(object):
     def __init__(self, indices, value):
         self.indices = indices
         self.value = value
+
+    def __lt__(self, other):
+        return self.indices < other.indices
 
     def __repr__(self):
         return "FakeIndexable(%s)" % repr(self.value)
@@ -43,7 +46,7 @@ indexable.IIndexable.implement(
 )
 
 
-class IndexSetTest(unittest.TestCase):
+class IndexSetTest(testlib.EfilterTestCase):
     def testSingleSet(self):
         e1 = FakeIndexable(["enum_foo", 1], "foo")
         e2 = FakeIndexable(["enum_bar", 2, "bar"], "bar")
@@ -81,7 +84,7 @@ class IndexSetTest(unittest.TestCase):
 
     def testSetUnion(self):
         elements = [FakeIndexable([i, "s%d" % i, (i, None)], i)
-                    for i in xrange(20)]
+                    for i in range(20)]
 
         iset1 = indexset.IndexSet(elements[0:9])
         iset2 = indexset.IndexSet(elements[10:19])
@@ -99,7 +102,7 @@ class IndexSetTest(unittest.TestCase):
 
     def testSetIntersection(self):
         elements = [FakeIndexable([i, "s%d" % i, (i, None)], i)
-                    for i in xrange(20)]
+                    for i in range(20)]
 
         iset1 = indexset.IndexSet(elements[0:15])
         iset2 = indexset.IndexSet(elements[10:19])

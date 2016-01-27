@@ -41,6 +41,7 @@ protocols it requires on its children and guarantees on its return type.
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import abc
+import six
 
 
 class AnyType(object):
@@ -62,9 +63,11 @@ class AnyType(object):
         implements(5, MyProtocol)  # => True
     """
 
+BUILTIN_TYPES = [float, complex, type(None), AnyType, set, frozenset,
+                 list, dict, tuple]
 
-BUILTIN_TYPES = (int, float, long, complex, basestring, tuple, list, dict, set,
-                 frozenset, type(None), AnyType)
+BUILTIN_TYPES.extend(six.integer_types)
+BUILTIN_TYPES.extend(six.string_types)
 
 
 def implements(obj, protocol):
@@ -87,9 +90,8 @@ def isa(cls, protocol):
     return issubclass(cls, protocol) or issubclass(AnyType, protocol)
 
 
-class Protocol(object):
+class Protocol(six.with_metaclass(abc.ABCMeta, object)):
     """Collection of related functions that operate on a type (interface)."""
-    __metaclass__ = abc.ABCMeta
 
     _required_functions = frozenset()
     _optional_functions = frozenset()
@@ -137,7 +139,7 @@ class Protocol(object):
                 raise TypeError(
                     "%r doesn't implement %r so it cannot participate in "
                     "the protocol %r." %
-                    (for_type, function.func.func_name, cls))
+                    (for_type, function.func.__name__, cls))
 
         cls.register(for_type)
 
@@ -169,7 +171,7 @@ class Protocol(object):
         protocol_functions = cls.functions()
         remaining = set(protocol_functions)
 
-        for func, impl in implementations.iteritems():
+        for func, impl in six.iteritems(implementations):
             if func not in protocol_functions:
                 func_name = getattr(func, "func_name", repr(func))
                 raise TypeError("Function %s is not part of the protocol %r." %
@@ -180,24 +182,6 @@ class Protocol(object):
             remaining.remove(func)
 
         cls.implemented(for_type=for_type)
-
-    @staticmethod
-    def _get_static_dispatcher(for_type, function):
-        method = getattr(for_type, function.func_name, None)
-
-        if getattr(method, "im_self", None) == for_type:
-            # This is a classmethod. In Python, there's really no such
-            # thing as a class method - they are instance methods with
-            # the self argument automatically bound to the class. In a true
-            # Python fashion, this has a ton of edge cases, the most
-            # problematic of which is the fact that, unlike instance
-            # methods, class methods cannot be called as functions with
-            # a cls argument. We steer clear of the whole mess by just
-            # grabbing the function that was passed to the classmethod
-            # decorator.
-            method = method.im_func
-
-        return method
 
     @classmethod
     def implicit_static(cls, for_type=None, for_types=None):
@@ -216,17 +200,17 @@ class Protocol(object):
         for type_ in cls.__get_type_args(for_type, for_types):
             implementations = {}
             for function in cls.required():
-                method = cls._get_static_dispatcher(type_, function)
+                method = getattr(type_, function.__name__, None)
                 if not callable(method):
                     raise TypeError(
                         "%s.implicit invokation on type %r is missing instance "
                         "method %r."
-                        % (cls.__name__, type_, function.func_name))
+                        % (cls.__name__, type_, function.__name__))
 
                 implementations[function] = method
 
             for function in cls.optional():
-                method = cls._get_static_dispatcher(type_, function)
+                method = getattr(type_, function.__name__, None)
 
                 if callable(method):
                     implementations[function] = method
@@ -279,7 +263,7 @@ class Protocol(object):
             implementations = {}
             for function in cls.functions():
                 implementations[function] = cls._build_late_dispatcher(
-                    func_name=function.func_name)
+                    func_name=function.__name__)
 
             cls.implement(for_type=type_, implementations=implementations)
 

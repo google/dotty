@@ -50,7 +50,7 @@ class UnitCoverageTest(testlib.EfilterTestCase):
             self.assertTrue(
                 callable(test),
                 "%r is missing a test for %r over type %r." %
-                (test_cls.__name__, function.func_name, t.__name__))
+                (test_cls.__name__, function.__name__, t.__name__))
 
     def testAsDottySQLCoverage(self):
         self.assertUnitCoverage(asdottysql.asdottysql,

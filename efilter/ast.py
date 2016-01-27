@@ -25,6 +25,8 @@ interpretted.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
+
 from efilter import protocol
 
 from efilter.protocols import associative
@@ -283,7 +285,7 @@ class Membership(BinaryExpression):
 
 
 class RegexFilter(BinaryExpression):
-    type_signature = (basestring, basestring)
+    type_signature = (six.string_types[0], six.string_types[0])
     return_signature = boolean.IBoolean
 
     @property
@@ -345,7 +347,7 @@ class IfElse(VariadicExpression):
 
     def conditions(self):
         """The if-else pairs."""
-        for idx in xrange(1, len(self.children), 2):
+        for idx in six.moves.range(1, len(self.children), 2):
             yield (self.children[idx - 1], self.children[idx])
 
     def default(self):

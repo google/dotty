@@ -22,11 +22,11 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 
 import abc
+import six
 
 
-class Syntax(object):
+class Syntax(six.with_metaclass(abc.ABCMeta, object)):
     """Base class representing parsers or generators of the EFILTER AST."""
-    __metaclass__ = abc.ABCMeta
 
     FRONTENDS = {}
     FORMATTERS = {}

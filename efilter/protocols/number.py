@@ -18,6 +18,8 @@
 
 """EFILTER abstract type system."""
 
+import six
+
 from efilter import dispatch
 from efilter import protocol
 
@@ -53,7 +55,7 @@ class INumber(protocol.Protocol):
 # Default implementations:
 
 INumber.implement(
-    for_types=(int, float, complex, long),
+    for_types=(float, complex) + six.integer_types,
     implementations={
         sum: lambda x, y: x + y,
         product: lambda x, y: x * y,

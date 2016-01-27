@@ -21,6 +21,7 @@ This module implements the DottySQL grammar (on tokens, not on a query string).
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import collections
+import six
 
 from efilter import ast
 from efilter import errors
@@ -67,7 +68,7 @@ def _multi_keyword(tokens, keyword_parts):
     matched_tokens = []
     limit = len(keyword_parts)
 
-    for idx in xrange(limit):
+    for idx in six.moves.range(limit):
         try:
             token = next(tokens)
         except StopIteration:

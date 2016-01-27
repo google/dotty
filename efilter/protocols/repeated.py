@@ -175,7 +175,7 @@ counted.ICounted.implement(
 )
 
 
-# Repeated value should sort as a tuple of themselves.
+# Repeated values should sort as a tuple of themselves.
 ordered.IOrdered.implement(
     for_type=IRepeated,
     implementations={

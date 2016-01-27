@@ -126,7 +126,7 @@ class SolveTest(testlib.EfilterTestCase):
                     ast.Literal(1),
                     ast.Literal(2),
                     ast.Literal(3))))
-        self.assertEquals(
+        self.assertEqual(
             solve.solve(query, {}).value,
             repeated.meld(3, 2, 1))
 
@@ -362,7 +362,7 @@ class SolveTest(testlib.EfilterTestCase):
             q.Query("pid == 1 or pid == 2 or pid == 3"),
             mocks.Process(2, None, None))
 
-        self.assertEquals(
+        self.assertEqual(
             q.Query(result.branch),
             q.Query("pid == 2"))
 

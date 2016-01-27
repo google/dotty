@@ -22,7 +22,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import cProfile
 import pstats
-import StringIO
+import six
 
 from efilter_tests import testlib
 
@@ -48,7 +48,7 @@ class EfilterBenchmarkCase(object):
         return self._profile
 
     def fixture_len(self):
-        with open(testlib.get_fixture_path(self.fixture_name), "rb") as fd:
+        with open(testlib.get_fixture_path(self.fixture_name), "r") as fd:
             return counted.count(repeated.lines(fd))
 
     def benchmark(self):
@@ -75,7 +75,7 @@ class EfilterBenchmarkCase(object):
         return self.full_stats().split("\n")[0].strip()
 
     def full_stats(self, sortby="cumulative"):
-        stream = StringIO.StringIO()
+        stream = six.StringIO()
         ps = pstats.Stats(self.profile(), stream=stream).sort_stats(sortby)
         ps.print_stats()
         return stream.getvalue()

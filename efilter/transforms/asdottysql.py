@@ -20,6 +20,8 @@ EFILTER DottySQL syntax output.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
+
 from efilter import dispatch
 from efilter import ast
 from efilter import syntax
@@ -30,7 +32,7 @@ from efilter.parsers.dottysql import grammar
 
 def __build_operator_lookup(table):
     lookup = {}
-    for operator in table.itervalues():
+    for operator in six.itervalues(table):
         if not (isinstance(operator.handler, type) and
                 issubclass(operator.handler, ast.Expression)):
             continue
@@ -65,7 +67,7 @@ def operators():
     return result
 
 
-BUILTINS = dict((v, k) for k, v in grammar.BUILTINS.iteritems())
+BUILTINS = dict((v, k) for k, v in six.iteritems(grammar.BUILTINS))
 
 
 def __expression_precedence(expr):
@@ -170,7 +172,7 @@ def asdottysql(expr):
         child_precedence += 1
 
     if (child_precedence is not None
-            and child_precedence < __expression_precedence(expr)):
+            and child_precedence < __expression_precedence(expr)[0]):
         return "not (%s)" % asdottysql(expr.value)
 
     return "not %s" % asdottysql(expr.value)

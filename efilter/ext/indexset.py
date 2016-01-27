@@ -23,6 +23,8 @@ elems per entry.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
+
 from efilter.protocols import indexable
 
 
@@ -77,7 +79,7 @@ class IndexSet(object):
 
     def pop(self):
         popped_elem = None
-        for elem in self._backing_dict.itervalues():
+        for elem in six.itervalues(self._backing_dict):
             popped_elem = elem
             break
 
@@ -121,7 +123,7 @@ class IndexSet(object):
         return self
 
     def union(self, other):
-        result = type(self)(self._backing_dict.itervalues())
+        result = type(self)(six.itervalues(self._backing_dict))
         for elem in other:
             if elem in result:
                 continue
@@ -174,7 +176,7 @@ class IndexSet(object):
     def __iter__(self):
         seen = set()
 
-        for elem in self._backing_dict.itervalues():
+        for elem in six.itervalues(self._backing_dict):
             indices = set(indexable.indices(elem))
             if seen & indices:
                 continue
@@ -183,7 +185,13 @@ class IndexSet(object):
             seen |= indices
 
     def __eq__(self, other):
-        return sorted(self.indices()) == sorted(other.indices())
+        # Doing a sorted comparison in Python 3 requires that all the elements
+        # in the tuple be of the same type - repr kind of takes care of that.
+        #
+        # Of course this isn't ideal, but there doesn't seem to be a better
+        # way to implement a sorted compare.
+        return sorted(self.indices(), key=repr) == sorted(other.indices(),
+                                                          key=repr)
 
     def __ne__(self, other):
         return not self.__eq__(other)

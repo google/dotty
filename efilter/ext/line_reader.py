@@ -20,6 +20,7 @@ Implements IRepeated for text files and some common formats.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
 import threading
 
 from efilter.protocols import counted
@@ -67,7 +68,7 @@ class LazyLineReader(object):
             line, offset = self.readline_at_offset(offset)
 
     def value_type(self):
-        return basestring
+        return six.string_types[0]
 
     def value_eq(self, other):
         if isinstance(other, type(self)):
@@ -90,4 +91,14 @@ class LazyLineReader(object):
 
 counted.ICounted.implicit_static(for_type=LazyLineReader)
 repeated.IRepeated.implicit_static(LazyLineReader)
-repeated.lines.implement(for_type=file, implementation=LazyLineReader)
+
+
+if six.PY2:
+    # Python 3 doesn't have a file class. open() just returns a StringIO
+    repeated.lines.implement(for_type=file, implementation=LazyLineReader)
+
+if six.PY3:
+    import io
+    repeated.lines.implement(for_type=io.IOBase, implementation=LazyLineReader)
+
+repeated.lines.implement(for_type=six.StringIO, implementation=LazyLineReader)

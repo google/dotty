@@ -20,6 +20,8 @@ EFILTER stdlib - IO module.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
+
 from efilter.ext import csv_reader
 
 from efilter.protocols import repeated
@@ -44,7 +46,7 @@ class Lines(core.TypedFunction):
     name = "lines"
 
     def __call__(self, path):
-        fd = open(path, "rb")
+        fd = open(path, "r")
         # We don't close fd here, because repeated.lines is lazy and will read
         # on demand. The descriptor will be closed in the repeated value's
         # destructor.
@@ -52,7 +54,7 @@ class Lines(core.TypedFunction):
 
     @classmethod
     def reflect_static_args(cls):
-        return (basestring,)
+        return (six.string_types[0],)
 
     @classmethod
     def reflect_static_return(cls):
@@ -83,7 +85,7 @@ class CSV(core.TypedFunction):
 
     def __call__(self, path, decode_header=False, delim=",", quote="\"",
                  trim=True):
-        fd = open(path, "rb")
+        fd = open(path, "r")
         # We don't close fd here, because repeated.lines is lazy and will read
         # on demand. The descriptor will be closed in the repeated value's
         # destructor.
@@ -92,7 +94,7 @@ class CSV(core.TypedFunction):
 
     @classmethod
     def reflect_static_args(cls):
-        return (basestring, bool)
+        return (six.string_types[0], bool)
 
     @classmethod
     def reflect_static_return(cls):

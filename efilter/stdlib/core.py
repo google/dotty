@@ -26,6 +26,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 
 import itertools
+import six
 
 from efilter import protocol
 
@@ -169,11 +170,11 @@ class Lower(TypedFunction):
 
     @classmethod
     def reflect_static_args(cls):
-        return (basestring,)
+        return (six.string_types[0],)
 
     @classmethod
     def reflect_static_return(cls):
-        return basestring
+        return six.string_types[0]
 
 
 class Count(TypedFunction):

@@ -21,6 +21,7 @@ Implements IRepeated using a restartable generator.
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter.protocols import counted
+from efilter.protocols import ordered
 from efilter.protocols import repeated
 
 
@@ -124,7 +125,10 @@ class LazyRepetition(object):
         return self._value_type
 
     def value_eq(self, other):
-        return sorted(self.getvalues()) == sorted(repeated.getvalues(other))
+        """Sorted comparison of values."""
+        self_sorted = ordered.ordered(self.getvalues())
+        other_sorted = ordered.ordered(repeated.getvalues(other))
+        return self_sorted == other_sorted
 
     def value_apply(self, f):
         def _generator():

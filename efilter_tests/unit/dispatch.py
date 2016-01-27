@@ -21,6 +21,7 @@ EFILTER test suite.
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import abc
+import six
 import unittest
 
 from efilter import dispatch
@@ -32,12 +33,12 @@ class Animal(object):
     pass
 
 
-class Feline(object):
-    __metaclass__ = abc.ABCMeta
+class Feline(six.with_metaclass(abc.ABCMeta)):
+    pass
 
 
-class Aquatic(object):
-    __metaclass__ = abc.ABCMeta
+class Aquatic(six.with_metaclass(abc.ABCMeta)):
+    pass
 
 
 class Mammal(Animal):

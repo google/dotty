@@ -323,10 +323,9 @@ def solve_sort(expr, vars):
     sort_expression = expr.rhs
 
     def _key_func(x):
-        sort_value = solve(sort_expression, scope.ScopeStack(vars, x))
-        return ordered.assortkey(sort_value)
+        return solve(sort_expression, scope.ScopeStack(vars, x)).value
 
-    results = sorted(lhs_values, key=_key_func)
+    results = ordered.ordered(lhs_values, key_func=_key_func)
 
     return Result(repeated.meld(*results), ())
 
@@ -544,8 +543,14 @@ def solve_strictorderedset(expr, vars):
     for child in iterator:
         val = solve(child, vars).value
 
-        if not min_ > val or val is None:
-            return Result(False, ())
+        try:
+            if not min_ > val or val is None:
+                return Result(False, ())
+        except TypeError:
+            raise errors.EfilterTypeError(expected=type(min_),
+                                          actual=type(val),
+                                          root=child,
+                                          query=expr.source,)
 
         min_ = val
 
@@ -563,8 +568,14 @@ def solve_partialorderedset(expr, vars):
     for child in iterator:
         val = solve(child, vars).value
 
-        if min_ < val or val is None:
-            return Result(False, ())
+        try:
+            if min_ < val or val is None:
+                return Result(False, ())
+        except TypeError:
+            raise errors.EfilterTypeError(expected=type(min_),
+                                          actual=type(val),
+                                          root=child,
+                                          query=expr.source)
 
         min_ = val
 

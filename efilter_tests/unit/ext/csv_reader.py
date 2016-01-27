@@ -31,20 +31,20 @@ from efilter.protocols import repeated
 class LazyFileReadersTest(testlib.EfilterTestCase):
     def testReading(self):
         """Test that reader reads the same lines as the File object."""
-        with open(testlib.get_fixture_path("small.csv"), "rb") as fd:
+        with open(testlib.get_fixture_path("small.csv"), "r") as fd:
             reader = csv_reader.LazyCSVReader(fd)
             self.assertValuesEqual(reader, repeated.meld(*small_csv.EXPECTED))
 
     def testDicts(self):
         """Test building dicts."""
-        with open(testlib.get_fixture_path("small.csv"), "rb") as fd:
+        with open(testlib.get_fixture_path("small.csv"), "r") as fd:
             reader = csv_reader.LazyCSVReader(fd, output_dicts=True)
             first_row = next(iter(reader))
             self.assertEqual(dict(Name="Alice", Age="25", City="Zurich"),
                              first_row)
 
     def testCloseInDestructor(self):
-        fd = open(testlib.get_fixture_path("names.txt"), "rb")
+        fd = open(testlib.get_fixture_path("names.txt"), "r")
         reader = csv_reader.LazyCSVReader(fd)
 
         for _ in reader:

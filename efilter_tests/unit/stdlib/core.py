@@ -74,16 +74,16 @@ class CoreTest(testlib.EfilterTestCase):
             repeated.meld(1, 2, 3))
 
     def testCount(self):
-        self.assertEquals(
+        self.assertEqual(
             core.Count()(repeated.meld(1, 2, 3, 4)),
             4)
 
     def testReverse(self):
-        self.assertEquals(
+        self.assertEqual(
             core.Reverse()(repeated.meld(1, 2, 3, 4)),
             repeated.meld(4, 3, 2, 1))
 
     def testLower(self):
-        self.assertEquals(
+        self.assertEqual(
             core.Lower()("FOO"),
             "foo")

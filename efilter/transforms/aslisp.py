@@ -20,6 +20,8 @@ EFILTER lisp syntax output.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
+
 from efilter import dispatch
 from efilter import ast
 from efilter import syntax
@@ -28,7 +30,7 @@ from efilter import query as q
 from efilter.parsers import lisp
 
 
-EXPRESSIONS = dict((v, k) for k, v in lisp.EXPRESSIONS.iteritems())
+EXPRESSIONS = dict((v, k) for k, v in six.iteritems(lisp.EXPRESSIONS))
 
 
 @dispatch.multimethod

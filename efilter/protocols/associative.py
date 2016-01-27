@@ -18,6 +18,8 @@
 
 """EFILTER abstract type system."""
 
+import six
+
 from efilter import dispatch
 from efilter import protocol
 
@@ -90,4 +92,5 @@ IAssociative.implement(for_type=dict,
 IAssociative.implement(for_type=counted.ICounted,
                        implementations={
                            select: lambda c, idx: c[idx],
-                           getkeys_runtime: lambda c: xrange(counted.count(c))})
+                           getkeys_runtime:
+                               lambda c: six.moves.range(counted.count(c))})

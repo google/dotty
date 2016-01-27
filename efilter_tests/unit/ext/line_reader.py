@@ -30,7 +30,7 @@ from efilter.protocols import repeated
 class LazyFileReadersTest(testlib.EfilterTestCase):
     def testReading(self):
         """Test that reader reads the same lines as the File object."""
-        with open(testlib.get_fixture_path("names.txt"), "rb") as fd:
+        with open(testlib.get_fixture_path("names.txt"), "r") as fd:
             line_count = len(list(fd))
             # The fact that the fd.tell() is now at EOF shouldn't matter.
             reader = line_reader.LazyLineReader(fd)
@@ -38,7 +38,7 @@ class LazyFileReadersTest(testlib.EfilterTestCase):
 
     def testRestarting(self):
         """Test that the reader can restart and support multiple users."""
-        with open(testlib.get_fixture_path("names.txt"), "rb") as fd:
+        with open(testlib.get_fixture_path("names.txt"), "r") as fd:
             reader = line_reader.LazyLineReader(fd)
             iterator = iter(reader)
             iterator2 = iter(reader)
@@ -49,12 +49,12 @@ class LazyFileReadersTest(testlib.EfilterTestCase):
         """Test value_eq on LazyLineReader."""
         baseline = repeated.meld("Alice\n", "Bob\n", "Charlie\n", "Dave\n",
                                  "Eve\n", "Frank")
-        with open(testlib.get_fixture_path("names.txt"), "rb") as fd:
+        with open(testlib.get_fixture_path("names.txt"), "r") as fd:
             reader = line_reader.LazyLineReader(fd)
             self.assertValuesEqual(baseline, reader)
 
     def testCloseInDestructor(self):
-        fd = open(testlib.get_fixture_path("names.txt"), "rb")
+        fd = open(testlib.get_fixture_path("names.txt"), "r")
         reader = line_reader.LazyLineReader(fd)
 
         for _ in reader:

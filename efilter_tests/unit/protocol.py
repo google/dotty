@@ -86,13 +86,13 @@ IBovine.implicit_static(for_type=Vacka)
 class TypesTest(unittest.TestCase):
     def testProtocol(self):
         self.assertTrue(isinstance(Kyr(), IBovine))
-        self.assertEquals(say_moo(Kyr()), "Muu")
+        self.assertEqual(say_moo(Kyr()), "Muu")
         self.assertEqual(graze(Kyr()), "Om nom nom.")
 
     def testImplicitImplementation(self):
         self.assertTrue(isinstance(Vacka(), IBovine))
-        self.assertEquals(say_moo(Vacka()), "Buu")
+        self.assertEqual(say_moo(Vacka()), "Buu")
 
     def testDynamicImplementation(self):
         self.assertTrue(isinstance(Krava(), IBovine))
-        self.assertEquals(say_moo(Krava()), "Buu")
+        self.assertEqual(say_moo(Krava()), "Buu")

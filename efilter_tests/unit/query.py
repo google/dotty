@@ -31,7 +31,7 @@ from efilter.transforms import normalize
 class QueryTest(unittest.TestCase):
     def testCreation(self):
         q = query.Query("foo == bar")
-        self.assertEquals(
+        self.assertEqual(
             q.root,
             ast.Equivalence(ast.Var("foo"),
                             ast.Var("bar")))
@@ -45,7 +45,7 @@ class QueryTest(unittest.TestCase):
                         ast.Var("Process"),
                         ast.Var("pid")),
                     ast.Literal(10))))
-        self.assertEquals(q.source, "Process.pid != 10")
+        self.assertEqual(q.source, "Process.pid != 10")
 
     def testSourceCache(self):
         """Creating the query with valid source should preserve it."""

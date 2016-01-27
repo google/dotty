@@ -20,6 +20,7 @@ EFILTER query wrapper.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
 
 from efilter import syntax as s
 from efilter import ast
@@ -29,7 +30,7 @@ def guess_source_syntax(source):
     if isinstance(source, ast.Expression):
         return "expression"
 
-    if isinstance(source, basestring):
+    if isinstance(source, six.string_types):
         return "dottysql"
 
     if isinstance(source, tuple):

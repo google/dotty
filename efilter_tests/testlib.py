@@ -46,5 +46,8 @@ class EfilterTestCase(unittest.TestCase):
     def assertIsa(self, t, p):
         self.assertTrue(protocol.isa(t, p), "%r is not type %r." % (t, p))
 
+    def assertItemsEqual(self, x, y):
+        self.assertEqual(sorted(x), sorted(y))
+
     def assertValuesEqual(self, x, y):
         self.assertItemsEqual(repeated.getvalues(x), repeated.getvalues(y))

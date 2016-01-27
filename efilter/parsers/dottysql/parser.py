@@ -57,6 +57,7 @@ func_application = var "(" [ expression [ { "," expression } ] ] ")" .
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import itertools
+import six
 
 from efilter import ast
 from efilter import errors
@@ -168,7 +169,7 @@ class Parser(syntax.Syntax):
             return match
 
         try:
-            func_name = f.func_name
+            func_name = f.__name__
         except AttributeError:
             func_name = "<unnamed grammar construct>"
 
@@ -307,9 +308,9 @@ class Parser(syntax.Syntax):
         if self.matched_value is None:
             param = self.last_param
             self.last_param += 1
-        elif isinstance(self.matched_value, int):
+        elif isinstance(self.matched_value, six.integer_types):
             param = self.last_param = self.matched_value
-        elif isinstance(self.matched_value, basestring):
+        elif isinstance(self.matched_value, six.string_types):
             param = self.matched_value
         else:
             return self.error(

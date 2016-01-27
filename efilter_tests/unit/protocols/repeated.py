@@ -20,6 +20,7 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
 import unittest
 
 from efilter.protocols import superposition
@@ -47,7 +48,7 @@ class RepeatedTest(unittest.TestCase):
 
         # Using meld will just return a scalar on one value.
         r = repeated.meld("foo")
-        self.assertIsInstance(r, basestring)
+        self.assertIsInstance(r, six.string_types)
 
         # Meld on two values has the same behavior as repeated.
         r = repeated.meld("foo", "foo")

@@ -20,14 +20,14 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import unittest
-
 from efilter.ext import lazy_repetition
 
 from efilter.protocols import repeated
 
+from efilter_tests import testlib
 
-class LazyRepetitionTest(unittest.TestCase):
+
+class LazyRepetitionTest(testlib.EfilterTestCase):
     def testRestarting(self):
         def _generator():
             yield "a"

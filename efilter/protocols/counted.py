@@ -18,6 +18,8 @@
 
 """EFILTER abstract type system."""
 
+import six
+
 from efilter import dispatch
 from efilter import protocol
 
@@ -36,5 +38,8 @@ class ICounted(protocol.Protocol):
 
 # Default implementations:
 
-ICounted.implement(for_types=(list, tuple, set, frozenset, dict, basestring),
+ICounted.implement(for_types=(list, tuple, set, frozenset, dict),
+                   implementations={count: len})
+
+ICounted.implement(for_types=six.string_types,
                    implementations={count: len})

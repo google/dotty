@@ -43,8 +43,10 @@ class HYGDataDictPassthrough(benchmark.EfilterBenchmarkCase):
 
 class HYGDataFilter(benchmark.EfilterBenchmarkCase):
     fixture_name = "hygdata_v3.csv"
+    # The number we're comparing 'dist' to is a string because 'dist' is a
+    # string... This will go away when I implement a cast operator.
     query = ("SELECT proper as name, id FROM csv(?, decode_header: true)"
-             " WHERE dist < 300 AND count(proper) > 1")
+             " WHERE dist < '300' AND count(proper) > 1")
     name = "hygdata_filter_basic"
 
 
@@ -52,14 +54,16 @@ class HYGDataHandcoded(benchmark.EfilterBenchmarkCase):
     name = "hygdata_filter_basic_handcoded"
 
     def run(self):
-        with open(testlib.get_fixture_path("hygdata_v3.csv"), "rb") as fd:
+        with open(testlib.get_fixture_path("hygdata_v3.csv"), "r") as fd:
             for line in csv_reader.LazyCSVReader(fd, output_dicts=True):
-                if line["dist"] < 300 and len(line["proper"] > 1):
+                if float(line["dist"]) < 300 and len(line["proper"]) > 1:
                     _ = dict(name=line["proper"], id=line["id"])
 
 
 class HYGDataFilterLimit(benchmark.EfilterBenchmarkCase):
     fixture_name = "hygdata_v3.csv"
+    # The number we're comparing 'dist' to is a string because 'dist' is a
+    # string... This will go away when I implement a cast operator.
     query = ("SELECT proper as name, id FROM csv(?, decode_header: true)"
-             " WHERE dist > 10 LIMIT 10")
+             " WHERE dist > '10' LIMIT 10")
     name = "hygdata_filter_limit"

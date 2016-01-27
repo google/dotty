@@ -20,6 +20,7 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
 import unittest
 
 from efilter import query
@@ -37,7 +38,7 @@ class AsDottySQLTest(unittest.TestCase):
         pass
 
     def assertOutput(self, original, output):
-        if isinstance(original, basestring):
+        if isinstance(original, six.string_types):
             q = query.Query(original)
         else:
             q = query.Query(original)

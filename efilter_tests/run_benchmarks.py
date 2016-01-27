@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 from efilter_tests import benchmarks
 from efilter_tests import benchmark
 
@@ -17,8 +19,7 @@ def get_benchmarks(module):
 
 
 def main():
-    # pylint: disable=superfluous-parens
-    print "Running benchmarks..."
+    print("Running benchmarks...")
     for benchmark_cls in get_benchmarks(benchmarks):
         case = benchmark_cls()
         if case.fixture_name:

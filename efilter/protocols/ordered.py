@@ -18,11 +18,24 @@
 
 """EFILTER abstract type system."""
 
+import six
+
 from efilter import dispatch
 from efilter import protocol
 
 # Declarations:
 # pylint: disable=unused-argument
+
+
+def ordered(collection, key_func=None):
+    if callable(key_func):
+        def key_for_sorted(x):
+            return assortkey(key_func(x))
+
+    else:
+        key_for_sorted = assortkey
+
+    return sorted(collection, key=key_for_sorted)
 
 
 @dispatch.multimethod
@@ -40,5 +53,21 @@ IOrdered.implement(
     for_type=protocol.AnyType,
     implementations={
         assortkey: lambda x: x
+    }
+)
+
+
+IOrdered.implement(
+    for_type=dict,
+    implementations={
+        assortkey: lambda x: ordered(six.iteritems(x))
+    }
+)
+
+
+IOrdered.implement(
+    for_type=type(None),
+    implementations={
+        assortkey: lambda _: 0
     }
 )

@@ -21,6 +21,7 @@ EFILTER test helpers.
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import collections
+import six
 
 from efilter.protocols import applicative
 from efilter.protocols import associative
@@ -67,7 +68,7 @@ class Process(collections.namedtuple("Process", ["pid", "name", "parent"])):
 
 PROCESS_DEFS = {
     "pid": int,
-    "name": unicode,
+    "name": six.text_type,
     "parent": Process}
 
 
@@ -93,7 +94,7 @@ class _proc(collections.namedtuple("_proc", ["p_pid", "p_comm", "p_ppid"])):
 
 PROC_DEFS = {
     "p_pid": int,
-    "p_comm": unicode,
+    "p_comm": six.text_type,
     "p_ppid": int}
 
 
@@ -107,13 +108,13 @@ class MockRootType(object):
         "Process": {
             "_": Process,
             "pid": int,
-            "name": unicode,
+            "name": six.text_type,
             "parent": Process,
         },
         "_proc": {
             "_": _proc,
             "p_pid": int,
-            "p_comm": unicode,
+            "p_comm": six.text_type,
             "p_ppid": int,
         },
         "MockFunction": {

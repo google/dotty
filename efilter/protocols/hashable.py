@@ -20,6 +20,7 @@
 
 import datetime
 import numbers
+import six
 
 from efilter import dispatch
 from efilter import protocol
@@ -39,6 +40,12 @@ class IHashable(protocol.Protocol):
 
 # Default implementations:
 
-IHashable.implement(for_types=(basestring, numbers.Number, type(None),
-                               tuple, frozenset, datetime.datetime),
+IHashable.implement(for_types=six.string_types,
+                    implementations={hashed: hash})
+
+IHashable.implement(for_types=six.integer_types,
+                    implementations={hashed: hash})
+
+IHashable.implement(for_types=(numbers.Number, type(None), tuple, frozenset,
+                               datetime.datetime),
                     implementations={hashed: hash})

@@ -25,6 +25,7 @@ This module implements multimethod function dispatch.
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import functools
+import six
 import threading
 
 
@@ -53,10 +54,12 @@ def call_audit(func):
         import traceback
         stack = traceback.extract_stack()
         r = func(*args, **kwargs)
+        func_name = func.__name__
+
         print("@depth %d, trace %s -> %s(*%r, **%r) => %r" % (
             len(stack),
             " -> ".join("%s:%d:%s" % x[0:3] for x in stack[-5:-2]),
-            func.func_name,
+            func_name,
             args,
             kwargs,
             r))
@@ -177,7 +180,7 @@ class multimethod(object):
 
     @property
     def func_name(self):
-        return self.func.func_name
+        return self.func.__name__
 
     def __repr__(self):
         return "multimethod(%s)" % self.func_name
@@ -317,13 +320,13 @@ class multimethod(object):
                                 "Two candidate implementations found for "
                                 "multimethod function %s (dispatch type %s) "
                                 "and neither is preferred." %
-                                (self.func.func_name, dispatch_type))
+                                (self.func_name, dispatch_type))
                     else:
                         result = candidate_func
                         result_type = candidate_type
                         best_match = match
 
-                if match < best_match:
+                if (match or 0) < (best_match or 0):
                     result = candidate_func
                     result_type = candidate_type
                     best_match = match
@@ -377,6 +380,13 @@ class multimethod(object):
 
         return _decorator
 
+    @staticmethod
+    def __get_unbound_function(method):
+        try:
+            return six.get_method_function(method)
+        except AttributeError:
+            return method
+
     def implement(self, implementation, for_type=None, for_types=None):
         """Registers an implementing function for for_type.
 
@@ -390,11 +400,12 @@ class multimethod(object):
         Raises:
             ValueError
         """
+        unbound_implementation = self.__get_unbound_function(implementation)
         for_types = self.__get_types(for_type, for_types)
 
         for t in for_types:
             self._write_lock.acquire()
             try:
-                self.implementations.append((t, implementation))
+                self.implementations.append((t, unbound_implementation))
             finally:
                 self._write_lock.release()

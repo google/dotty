@@ -23,6 +23,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import collections
 import re
+import six
 
 from efilter import errors
 
@@ -164,7 +165,7 @@ class Lexer(object):
 
         try:
             tokens = iter(self)
-            for _ in xrange(steps):
+            for _ in six.moves.range(steps):
                 next(tokens)
 
             return next(tokens)
@@ -172,7 +173,7 @@ class Lexer(object):
             return None
 
     def skip(self, steps=1):
-        for _ in xrange(steps):
+        for _ in six.moves.range(steps):
             self.next_token()
 
     def next_token(self):

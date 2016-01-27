@@ -100,7 +100,7 @@ class InferTypeTest(testlib.EfilterTestCase):
                 mocks.MockRootType),
             number.INumber)
 
-        self.assertEquals(
+        self.assertEqual(
             infer_type.infer_type(
                 q.Query("Process[var_name]"),
                 mocks.MockRootType),
