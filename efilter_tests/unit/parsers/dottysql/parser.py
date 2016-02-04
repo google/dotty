@@ -33,9 +33,24 @@ class ParserTest(unittest.TestCase):
         p = parser.Parser(query, params=params)
         self.assertEqual(expected, p.parse())
 
-    def assertQueryRaises(self, query, params=None):
+    def assertQueryRaises(self, query, params=None, f=None):
         p = parser.Parser(query, params=params)
-        self.assertRaises(errors.EfilterParseError, p.parse)
+
+        try:
+            p.parse()
+        except errors.EfilterParseError as error:
+            if callable(f) and not f(error):
+                self.fail("Raised the wrong exception: %r." % error)
+
+            return True
+
+        self.fail("Didn't raise an exception.")
+
+    def testEmptyQueryRaises(self):
+        self.assertQueryRaises(" ",
+                               f=lambda error: "Unexpected end" in str(error))
+        self.assertQueryRaises("",
+                               f=lambda error: "Unexpected end" in str(error))
 
     def testOperatorCaseSensitivity(self):
         self.assertQueryMatches(

@@ -23,7 +23,7 @@ echo "Going to run pylint and autopep8 now..."
 for f in $( git diff master --name-only | grep ".py"); do
   if [ -e $f ]; then
     echo "Validating and reformatting $f"
-    autopep8 --ignore E309,E711 -i -r --max-line-length 80 $f
+    autopep8 --ignore E309,E301,E711 -i -r --max-line-length 80 $f
     pylint --rcfile pylintrc $f
   fi
 done

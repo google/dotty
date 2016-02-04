@@ -57,7 +57,6 @@ func_application = var "(" [ expression [ { "," expression } ] ] ")" .
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import itertools
-import six
 
 from efilter import ast
 from efilter import errors
@@ -169,7 +168,7 @@ class Parser(syntax.Syntax):
             return match
 
         try:
-            func_name = f.__name__
+            func_name = f.func_name
         except AttributeError:
             func_name = "<unnamed grammar construct>"
 
@@ -300,17 +299,20 @@ class Parser(syntax.Syntax):
         if self.accept(grammar.lbracket):
             return self.list()
 
-        return self.error(
-            "Was not expecting %r here." % self.lexer.peek(0).name,
-            start_token=self.lexer.peek(0))
+        if self.lexer.peek(0):
+            return self.error(
+                "Was not expecting %r here." % self.lexer.peek(0).name,
+                start_token=self.lexer.peek(0))
+        else:
+            return self.error("Unexpected end of input.")
 
     def param(self):
         if self.matched_value is None:
             param = self.last_param
             self.last_param += 1
-        elif isinstance(self.matched_value, six.integer_types):
+        elif isinstance(self.matched_value, int):
             param = self.last_param = self.matched_value
-        elif isinstance(self.matched_value, six.string_types):
+        elif isinstance(self.matched_value, basestring):
             param = self.matched_value
         else:
             return self.error(
