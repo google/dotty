@@ -80,7 +80,7 @@ def solve(query, vars):
 def solve_query(query, vars):
     # Always include the standard library for now. We will revisit this later,
     # and probably add something to the AST for explicit imports.
-    vars = scope.ScopeStack(std_core.FUNCTIONS, vars)
+    vars = scope.ScopeStack(std_core.MODULE, vars)
 
     try:
         return solve(query.root, vars)
@@ -99,7 +99,7 @@ def solve_literal(expr, vars):
 
 @solve.implementation(for_type=ast.Var)
 def solve_var(expr, vars):
-    """Returns the value of the var (var) named in the expression."""
+    """Returns the value of the var named in the expression."""
     try:
         return Result(structured.resolve(vars, expr.value), ())
     except (KeyError, AttributeError) as e:
@@ -373,11 +373,52 @@ def solve_any(expr, vars):
     return result
 
 
+@solve.implementation(for_type=ast.Cast)
+def solve_cast(expr, vars):
+    """Get cast LHS to RHS."""
+    lhs = solve(expr.lhs, vars).value
+    t = solve(expr.rhs, vars).value
+
+    if t is None:
+        raise errors.EfilterTypeError(
+            root=expr, query=expr.source,
+            message="Cannot find type named %r." % expr.rhs.value)
+
+    if not isinstance(t, type):
+        raise errors.EfilterTypeError(
+            root=expr.rhs, query=expr.source,
+            message="%r is not a type and cannot be used with 'cast'." % (t,))
+
+    try:
+        cast_value = t(lhs)
+    except TypeError:
+        raise errors.EfilterTypeError(
+            root=expr, query=expr.source,
+            message="Invalid cast %s -> %s." % (type(lhs), t))
+
+    return Result(cast_value, ())
+
+
 @solve.implementation(for_type=ast.IsInstance)
 def solve_isinstance(expr, vars):
     """Typecheck whether LHS is type on the RHS."""
     lhs = solve(expr.lhs, vars)
-    t = structured.reflect(vars, expr.rhs)
+
+    try:
+        t = solve(expr.rhs, vars).value
+    except errors.EfilterKeyError:
+        t = None
+
+    if t is None:
+        raise errors.EfilterTypeError(
+            root=expr.rhs, query=expr.source,
+            message="Cannot find type named %r." % expr.rhs.value)
+
+    if not isinstance(t, type):
+        raise errors.EfilterTypeError(
+            root=expr.rhs, query=expr.source,
+            message="%r is not a type and cannot be used with 'isa'." % (t,))
+
     return Result(protocol.implements(lhs.value, t), ())
 
 

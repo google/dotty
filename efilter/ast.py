@@ -130,7 +130,7 @@ class VariadicExpression(Expression):
     __abstract = True
 
 
-### Value (unary) expressions ###
+# Value (unary) expressions ###
 
 class Literal(ValueExpression):
     """Represents a literal, which is to say not-an-expression."""
@@ -156,7 +156,7 @@ class Complement(UnaryOperation):
     return_signature = boolean.IBoolean
 
 
-### Binary expressions ###
+# Binary expressions ###
 
 class Pair(BinaryExpression):
     """Represents a key/value pair."""
@@ -217,6 +217,16 @@ class Resolve(BinaryExpression):
 
 class IsInstance(BinaryExpression):
     """Evaluates to True if the current scope is an instance of type."""
+
+    type_signature = (protocol.AnyType, type)
+    return_signature = bool
+
+
+class Cast(BinaryExpression):
+    """Represents a typecast."""
+
+    type_signature = (protocol.AnyType, type)
+    return_signature = protocol.AnyType
 
 
 class Within(BinaryExpression):
@@ -297,7 +307,7 @@ class RegexFilter(BinaryExpression):
         return self.rhs
 
 
-### Variadic Expressions ###
+# Variadic Expressions ###
 
 class Apply(VariadicExpression):
     """Represents application of arguments to a function."""
@@ -331,7 +341,7 @@ class Tuple(VariadicExpression):
     return_signature = tuple
 
 
-### Conditionals ###
+# Conditionals ###
 
 class IfElse(VariadicExpression):
     """Evaluates as if-else if-else if-else blocks.
@@ -356,7 +366,7 @@ class IfElse(VariadicExpression):
             return self.children[-1]
 
 
-### Logical Variadic ###
+# Logical Variadic ###
 
 class LogicalOperation(VariadicExpression):
     type_signature = boolean.IBoolean
@@ -377,7 +387,7 @@ class Intersection(LogicalOperation):
     return_signature = bool
 
 
-### Variadic Relations ###
+# Variadic Relations ###
 
 class Relation(VariadicExpression):
     return_signature = boolean.IBoolean
@@ -409,7 +419,7 @@ class Equivalence(Relation):
     type_signature = eq.IEq
 
 
-### Variadic Arithmetic ###
+# Variadic Arithmetic ###
 
 class NumericExpression(VariadicExpression):
     """Arithmetic expressions."""

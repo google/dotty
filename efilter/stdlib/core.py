@@ -36,6 +36,14 @@ from efilter.protocols import repeated
 from efilter.protocols import structured
 
 
+_BUILTIN_TYPES = {
+    "int": int,
+    "str": six.text_type,
+    "bytes": six.binary_type,
+    "float": float
+}
+
+
 class TypedFunction(object):
     name = None
 
@@ -58,19 +66,24 @@ applicative.IApplicative.implicit_dynamic(TypedFunction)
 
 
 class LibraryModule(object):
-    functions = None
+    vars = None
+    name = None
 
-    def __init__(self, functions):
-        self.functions = functions
+    def __init__(self, vars, name=None):
+        self.vars = vars
+        self.name = name
+
+    def __repr__(self):
+        return "LibraryModule(name=%r, vars=%r)" % (self.name, self.vars)
 
     def getmembers_runtime(self):
-        return self.functions.keys()
+        return self.vars.keys()
 
     def resolve(self, name):
-        return self.functions[name]
+        return self.vars[name]
 
     def reflect_runtime_member(self, name):
-        return type(self.resolve(name))
+        return type(self.vars.get(name))
 
 
 structured.IStructured.implicit_static(LibraryModule)
@@ -214,5 +227,7 @@ class Reverse(TypedFunction):
         return repeated.IRepeated
 
 
-FUNCTIONS = LibraryModule(dict(take=Take(), drop=Drop(), count=Count(),
-                               reverse=Reverse(), lower=Lower()))
+_VARS = dict(take=Take(), drop=Drop(),
+             count=Count(), reverse=Reverse(), lower=Lower())
+_VARS.update(_BUILTIN_TYPES)
+MODULE = LibraryModule(vars=_VARS, name="stdcore")

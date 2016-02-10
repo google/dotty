@@ -32,6 +32,7 @@ EXPRESSIONS = {
     "var": ast.Var,
     "!": ast.Complement,
     "select": ast.Select,
+    "cast": ast.Cast,
     "isa": ast.IsInstance,
     "map": ast.Map,
     "filter": ast.Filter,

@@ -20,7 +20,7 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import unittest
+from efilter_tests import testlib
 
 from efilter import ast
 from efilter import errors
@@ -28,7 +28,7 @@ from efilter import errors
 from efilter.parsers.dottysql import parser
 
 
-class ParserTest(unittest.TestCase):
+class ParserTest(testlib.EfilterTestCase):
     def assertQueryMatches(self, query, expected, params=None):
         p = parser.Parser(query, params=params)
         self.assertEqual(expected, p.parse())
@@ -353,6 +353,20 @@ class ParserTest(unittest.TestCase):
             ast.Repeat(ast.Literal(1),
                        ast.Literal(2),
                        ast.Literal(3)))
+
+    def testIsInstance(self):
+        self.assertQueryMatches(
+            "5 isa int",
+            ast.IsInstance(
+                ast.Literal(5),
+                ast.Var("int")))
+
+    def testCast(self):
+        self.assertQueryMatches(
+            "cast(5, int)",
+            ast.Cast(
+                ast.Literal(5),
+                ast.Var("int")))
 
     def testIfElse(self):
         self.assertQueryMatches(

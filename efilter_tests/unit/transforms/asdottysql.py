@@ -126,6 +126,11 @@ class AsDottySQLTest(unittest.TestCase):
             original=(":", "x", ("+", 5, 5)),
             output="'x': (5 + 5)")
 
+    def testCast(self):
+        self.assertOutput(
+            original=("cast", "5", ("var", "int")),
+            output="cast('5', int)")
+
     def testIsInstance(self):
         self.assertOutput(
             original="x isa t",

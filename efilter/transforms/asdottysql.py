@@ -93,8 +93,8 @@ def asdottysql(query):
     return asdottysql(query.root)
 
 
-@asdottysql.implementation(for_type=ast.Within)
-def asdottysql(expr):
+@asdottysql.implementation(for_types=(ast.Within, ast.Cast))
+def asdottysql_builtin(expr):
     if not type(expr) in BUILTINS:
         return "<Subexpression cannot be formatted as DottySQL.>"
 
@@ -103,7 +103,7 @@ def asdottysql(expr):
 
 
 @asdottysql.implementation(for_type=ast.Map)
-def asdottysql(expr):
+def asdottysql_map(expr):
     lhs = asdottysql(expr.lhs)
     rhs = asdottysql(expr.rhs)
 
@@ -116,7 +116,7 @@ def asdottysql(expr):
 
 @asdottysql.implementation(for_types=(ast.NumericExpression, ast.Relation,
                                       ast.LogicalOperation))
-def asdottysql(expr):
+def asdottysql_operator(expr):
     operator = infix()[type(expr)]
     children = []
 

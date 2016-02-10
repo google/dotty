@@ -75,7 +75,7 @@ def apply(query, replacements=None, vars=None, allow_io=False):
 
     query = q.Query(query, params=replacements)
     if allow_io:
-        vars = scope.ScopeStack(std_io.FUNCTIONS, vars)
+        vars = scope.ScopeStack(std_io.MODULE, vars)
 
     results = solve.solve(query, vars).value
 

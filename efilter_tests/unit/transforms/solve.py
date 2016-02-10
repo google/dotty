@@ -260,11 +260,39 @@ class SolveTest(testlib.EfilterTestCase):
             mocks.Process(1, None, None))
 
     def testIsInstance(self):
+        # STFU, pylint, autopep says this is correct, so it's correct.
+        # pylint: disable=bad-continuation
+        with self.assertRaises(
+                errors.EfilterTypeError,
+                error_f=lambda e: "Cannot find type named 'FooBar'" in str(e)):
+            solve.solve(q.Query("proc isa FooBar"), mocks.MockRootType())
+
         self.assertEqual(
             solve.solve(
                 q.Query("proc isa Process"),
-                {"proc": mocks.Process(None, None, None)}).value,
+                mocks.MockRootType()).value,
             True)
+
+        # Builtin types should work, too.
+        self.assertEqual(
+            solve.solve(
+                q.Query("5 isa int"),
+                {}).value,
+            True)
+
+        # Always never forget to test for negatives.
+        self.assertEqual(
+            solve.solve(
+                q.Query("5 isa str"),
+                {}).value,
+            False)
+
+    def testCast(self):
+        self.assertEqual(
+            solve.solve(
+                q.Query("cast(5, str)"),
+                {}).value,
+            "5")
 
     def testComplement(self):
         self.assertEqual(
@@ -377,11 +405,4 @@ class SolveTest(testlib.EfilterTestCase):
             q.Query("any Process.parent where (Process.pid == 1 or "
                     "Process.command == 'foo')"),
             {"Process": {"parent": {"Process": {"pid": 1}}}})
-        self.assertEqual(True, result.value)
-
-    def testTypeOps(self):
-        result = solve.solve(
-            q.Query("proc isa Process"),
-            {"proc": mocks.Process(None, None, None)})
-
         self.assertEqual(True, result.value)

@@ -96,33 +96,33 @@ class InferTypeTest(testlib.EfilterTestCase):
     def testSelect(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("Process['pid']"),
+                q.Query("proc['pid']"),
                 mocks.MockRootType),
             number.INumber)
 
         self.assertEqual(
             infer_type.infer_type(
-                q.Query("Process[var_name]"),
+                q.Query("proc[var_name]"),
                 mocks.MockRootType),
             protocol.AnyType)
 
     def testResolve(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("Process.pid"),
+                q.Query("proc.pid"),
                 mocks.MockRootType),
             number.INumber)
 
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("Process.parent.pid"),
+                q.Query("proc.parent.pid"),
                 mocks.MockRootType),
             number.INumber)
 
     def testAny(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("any Process.parent where (name == 'init')"),
+                q.Query("any pslist where (parent.name == 'init')"),
                 mocks.MockRootType),
             boolean.IBoolean)
 
@@ -163,14 +163,14 @@ class InferTypeTest(testlib.EfilterTestCase):
     def testFilter(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("select * from Process where (parent.pid == 10)"),
+                q.Query("select * from pslist where (parent.pid == 10)"),
                 mocks.MockRootType),
             mocks.Process)
 
     def testSort(self):
         self.assertIsa(
             infer_type.infer_type(
-                q.Query("select * from Process order by parent.pid"),
+                q.Query("select * from pslist order by parent.pid"),
                 mocks.MockRootType),
             mocks.Process)
 

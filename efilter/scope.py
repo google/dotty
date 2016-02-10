@@ -50,6 +50,9 @@ class ScopeStack(object):
     def locals(self):
         return self.scopes[-1]
 
+    def __repr__(self):
+        return "ScopeStack(%s)" % ", ".join((repr(s) for s in self.scopes))
+
     def __init__(self, *scopes):
         flattened_scopes = []
         for scope in scopes:
@@ -148,12 +151,19 @@ class ScopeStack(object):
             through the reflection API. For example, Rekall uses objects
             generated at runtime to simulate a native (C/C++) type system.
         """
+        # Return whatever the most local scope defines this as, or bubble all
+        # the way to the top.
+        result = None
         for scope in reversed(self.scopes):
             try:
                 if isinstance(scope, type):
-                    return structured.reflect_static_member(scope, name)
+                    result = structured.reflect_static_member(scope, name)
                 else:
-                    return structured.reflect_runtime_member(scope, name)
+                    result = structured.reflect_runtime_member(scope, name)
+
+                if result is not None:
+                    return result
+
             except (NotImplementedError, KeyError, AttributeError):
                 continue
 

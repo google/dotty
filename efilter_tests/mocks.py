@@ -25,9 +25,8 @@ import six
 
 from efilter.protocols import applicative
 from efilter.protocols import associative
+from efilter.protocols import repeated
 from efilter.protocols import structured
-
-from efilter.stdlib import core as std_core
 
 
 class MockFunction(object):
@@ -104,37 +103,26 @@ applicative.IApplicative.implicit_static(MockFunction)
 
 
 class MockRootType(object):
-    DEFS = {
-        "Process": {
-            "_": Process,
-            "pid": int,
-            "name": six.text_type,
-            "parent": Process,
-        },
-        "_proc": {
-            "_": _proc,
-            "p_pid": int,
-            "p_comm": six.text_type,
-            "p_ppid": int,
-        },
-        "MockFunction": {
-            "_": MockFunction,
-        }
+    DATA = {
+        "Process": Process,
+        "proc": Process(10, "Finder", None),
+        "MockFunction": MockFunction(),
+        "pslist": repeated.meld(Process(1, "init", None),
+                                Process(10, "Finder", None))
     }
 
     def resolve(self, name):
-        return self.DEFS[name]()
+        return self.DATA[name]
 
     @classmethod
     def reflect_static_member(cls, name):
-        if name in cls.DEFS:
-            return cls.DEFS[name]["_"]
-
-        return type(std_core.FUNCTIONS.get(name))
+        var = cls.DATA.get(name)
+        if var:
+            return repeated.value_type(var)
 
     @classmethod
     def getmembers_static(cls):
-        return cls.DEFS.keys()
+        return cls.DATA.keys()
 
 
 structured.IStructured.implicit_static(MockRootType)

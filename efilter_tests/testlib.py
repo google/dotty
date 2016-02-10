@@ -51,3 +51,28 @@ class EfilterTestCase(unittest.TestCase):
 
     def assertValuesEqual(self, x, y):
         self.assertItemsEqual(repeated.getvalues(x), repeated.getvalues(y))
+
+    def assertRaises(self, error_type, error_f=None):
+        class _catcher(object):
+            def __init__(self, case):
+                self.case = case
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, tb):
+                if exc_value is None:
+                    return self.case.fail("Didn't raise %s!" % (error_type,))
+
+                if not issubclass(exc_type, error_type):
+                    return self.case.fail("Raised %s when %s was expected."
+                                          " Full error: %s." % (
+                                              exc_type, error_type, exc_value))
+
+                if callable(error_f) and not error_f(exc_value):
+                    return self.case.fail(
+                        "Exception %r didn't match control lambda." % exc_value)
+
+                return True
+
+        return _catcher(self)

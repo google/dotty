@@ -61,9 +61,9 @@ def infer_type(expr, scope=None):
 def infer_type(query, scope=None):
     # Always include stdcore at the top level.
     if scope:
-        scope = s.ScopeStack(std_core.FUNCTIONS, scope)
+        scope = s.ScopeStack(std_core.MODULE, scope)
     else:
-        scope = s.ScopeStack(std_core.FUNCTIONS)
+        scope = s.ScopeStack(std_core.MODULE)
 
     try:
         return infer_type(query.root, scope)
