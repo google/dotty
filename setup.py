@@ -124,5 +124,6 @@ setup(name="efilter",
           "bdist_rpm": BdistRPMCommand,
           "sdist": SDistCommand},
       install_requires=[
+          "python-six >= 1.4.0",
           "python-dateutil > 2",
           "pytz >= 2011k"])
