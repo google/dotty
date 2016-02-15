@@ -106,6 +106,11 @@ class SDistCommand(sdist):
     sdist.run(self)
 
 
+# Command bdist_msi does not support the library version, neither a date
+# as a version but if we suffix it with .1 everything is fine.
+if 'bdist_msi' in sys.argv:
+  __version__ += '.1'
+
 setup(name="efilter",
       version=__version__,
       description="EFILTER query language",
