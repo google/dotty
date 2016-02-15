@@ -109,6 +109,11 @@ class SDistCommand(sdist):
 setup(name="efilter",
       version=__version__,
       description="EFILTER query language",
+      long_description=(
+          "EFILTER is a general-purpose destructuring and search language "
+          "implemented in Python, and suitable for integration with any "
+          "Python project that requires a search function for some of its "
+          "data."),
       license="Apache 2.0",
       author="Adam Sindelar",
       author_email="adam.sindelar@gmail.com",

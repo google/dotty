@@ -1,0 +1,26 @@
+Source: efilter
+Section: python
+Priority: extra
+Maintainer: Adam Sindelar <adam.sindelar@gmail.com>
+Build-Depends: debhelper (>= 7), python-all (>= 2.7~), python-setuptools, python3-all (>= 3.2~), python3-setuptools
+Standards-Version: 3.9.5
+X-Python-Version: >= 2.7
+X-Python3-Version: >= 3.2
+Homepage: https://github.com/google/dotty/
+
+Package: python-efilter
+Architecture: all
+Depends: python-dateutil, python-six, python-tz, ${python:Depends}, ${misc:Depends}
+Description: EFILTER query language
+ EFILTER is a general-purpose destructuring and search language implemented in 
+ Python, and suitable for integration with any Python project that requires a 
+ search function for some of its data.
+
+Package: python3-efilter
+Architecture: all
+Depends: python-dateutil, python3-six, python3-tz, ${python3:Depends}, ${misc:Depends}
+Description: EFILTER query language
+ EFILTER is a general-purpose destructuring and search language implemented in 
+ Python, and suitable for integration with any Python project that requires a 
+ search function for some of its data.
+
