@@ -1,3 +1,2 @@
 include AUTHORS.txt LICENSE.txt README.md version.txt
-include utils/check_dependencies.py
 recursive-include dpkg *
