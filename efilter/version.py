@@ -52,8 +52,9 @@ try:
         """
         try:
             p = subprocess.Popen(
-                ["git", "log", "-1", "--format=%cd", "--date=iso-strict"],
+                ["git", "log", "-1", "--format=%cd", "--date=iso"],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+            errors = p.stderr.read()
             p.stderr.close()
             output = p.stdout.readlines()[0]
             date = parser.parse(output)
@@ -63,6 +64,8 @@ try:
             # may still 'succeed' as far as subprocess.Popen is concerned,
             # hence the IndexError exception. I don't know why Python sometimes
             # ignores the return code.
+            if errors:
+                logging.warn("Git logged messages to stderr: %r" % errors)
             return None
 except ImportError:
     logging.warn("pytz or dateutil are not available - getting a version "

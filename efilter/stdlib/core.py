@@ -83,7 +83,7 @@ class LibraryModule(object):
         return self.vars[name]
 
     def reflect_runtime_member(self, name):
-        return type(self.vars.get(name))
+        return type(self.vars[name])
 
 
 structured.IStructured.implicit_static(LibraryModule)

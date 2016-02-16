@@ -23,6 +23,8 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 from efilter_tests import testlib
 
 from efilter import api
+from efilter import errors
+from efilter import protocol
 
 
 class QueryTest(testlib.EfilterTestCase):
@@ -53,3 +55,28 @@ class QueryTest(testlib.EfilterTestCase):
                 data=[dict(name="Peter", age=20),
                       dict(name="Paul", age=30)])),
             [dict(age=20, name="Peter")])
+
+    def testInfer(self):
+        self.assertIsa(int, api.infer("5 + 5"))
+
+        # Test that IO needs to be explicit.
+        self.assertEqual(protocol.AnyType,
+                         api.infer("csv(path, decode_header:true)"))
+        self.assertIsa(dict, api.infer("csv(path, decode_header:true)",
+                                       allow_io=True))
+
+    def testUserFunc(self):
+        with self.assertRaises(errors.EfilterKeyError):
+            api.apply("my_func(1, 5)")
+
+        def my_func(x, y):
+            return x + y
+
+        with self.assertRaises(NotImplementedError):
+            api.apply("my_func(1, 5)",
+                      vars={"my_func": my_func})
+
+        # Need to define it as a user_func!
+        result = api.apply("my_func(1, 5)",
+                           vars={"my_func": api.user_func(my_func)})
+        self.assertEqual(result, 6)

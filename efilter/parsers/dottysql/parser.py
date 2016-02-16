@@ -57,6 +57,7 @@ func_application = var "(" [ expression [ { "," expression } ] ] ")" .
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import itertools
+import six
 
 from efilter import ast
 from efilter import errors
@@ -312,7 +313,7 @@ class Parser(syntax.Syntax):
             self.last_param += 1
         elif isinstance(self.matched_value, int):
             param = self.last_param = self.matched_value
-        elif isinstance(self.matched_value, basestring):
+        elif isinstance(self.matched_value, six.string_types):
             param = self.matched_value
         else:
             return self.error(

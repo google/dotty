@@ -1,66 +1,88 @@
 # EFILTER Query Language
 
-EFILTER is a general-purpose destructuring and search language implemented in Python, and suitable for integration with any Python project that requires a search function for some of its data.
+EFILTER is a general purpose query language designed to be embedded in Python applications and libraries. It supports SQL-like syntax to filter your application's data and provides a convenient way to directly search through the objects your applications manages.
 
-## Quick Example
+A second use case for EFILTER is to translate queries from one query language to another, such as from SQL to OpenIOC and so on. A basic SQL-like syntax and a POC lisp implementation are included with the language, and others are relatively simple to add.
 
-	query = Query("name == 'Bob' and age > (15 + 1)")
-	solve(query, dict(name="Alice", age=20)) # => False
-	solve(query, dict(name="Bob", age=20)) # => True
-	infer_type(query) # => bool
-	infer_type(Query("15 + 1")) # => int
+## Projects using EFILTER:
 
-## Integrating EFILTER with your project
+ - [Rekall](https://github.com/google/rekall)
 
-### Filtering custom classes
 
-Let's have a class in our custom project:
+## Quick examples of integration.
 
-	class Customer(object):
-		"""My awesome Customer business logic class."""
-		
-		@property
-		def name(self):
-			#...
-		
-		@property
-		def age(self):
-			#...
-		
-		@property
-		def admin(self):
-			#...
+    from efilter import api
+    api.apply("5 + 5") # => 10
 
-We'd like to filter this class's instances using EFILTER, but we need a way to
-'tell' EFILTER about it. 
+    # Returns [{"name": "Alice"}, {"name": "Eve"}]
+    api.apply("SELECT name FROM users WHERE age > 10",
+              vars={"users": ({"age": 10, "name": "Bob"},
+                              {"age": 20, "name": "Alice"},
+                              {"age": 30, "name": "Eve"}))
 
-EFILTER uses the IAssociative protocol to access members of the objects its
-asked to filter. Implementing a protocol lets EFILTER know how each type should
-be accessed:
 
-	from efilter.protocols import associative
-	associative.IAssociative.implement(
-		for_type=Customer,  # This is how you access Customer's data.
-		implementations={
-			# Select is similar to dict().get()
-			associative.select: lambda c, key: getattr(c, key, None),
-			
-			# Resolve is similar, but allowed to use magic to look
-			# up more data. For example, selecting 'admin' will
-			# return the ID of the admin user, but resolving
-			# 'admin' might return the user object representing
-			# the admin.
-			associative.resolve: lambda c, key: getattr(c, key, None),
-			
-			# Getkeys is kind of obvious: the keys that can be
-			# accessed.
-			associative.getkeys: lambda _: ("name", "age", "admin")
-		})
+### You can also filter custom objects:
 
-Now we can filter the Customer class:
+    # Step 1: have a custom class.
 
-	query = Query("name == 'Bob'")
-	solve(query, Customer(name="Bob")) # => True
+    class MyUser(object):
+        ...
+
+    # Step 2: Implement a protocol (like an interface).
+
+    from efilter.protocols import structured
+    structured.IStructured.implement(
+        for_type=MyUser,
+        implementations: {
+            structured.resolve: lambda user, key: getattr(user, key)
+        }
+    )
+
+    # Step 3: EFILTER can now use my class!
+    from efilter import api
+    api.apply("SELECT name FROM users WHERE age > 10 ORDER BY age",
+              vars={"users": [MyUser(...), MyUser(...)]})
+
+
+### Don't have SQL injections.
+
+EFILTER supports query templates, which can interpolate unescaped strings safely.
+
+    # Replacements are applied before the query is compiled.
+    search_term = dangerous_user_input["name"]
+    api.apply("SELECT * FROM users WHERE name = ?",
+              vars={"users": [...]},
+              replacements=[search_term])
+
+    # We also support keyword replacements.
+    api.apply("SELECT * FROM users WHERE name = {name}",
+              vars={"users": [...]},
+              replacements={"name": search_term})
+
+
+### Basic IO is supported, including CSV data sets.
+
+    # Builtin IO functions need to be explicitly enabled.
+    api.apply("SELECT * FROM csv(users.csv) WHERE name = 'Bob'", allow_io=True)
+
+
+## Language Reference
+
+Work in progress.
+
+
+## Protocol documentation
+
+Work in progress.
+
+
+## Example projects
+
+Several sample projects are provided.
+
+ - examples/star_catalog: filters a large CSV file with nearby star systems
+ - examples/custom_io: filter a proprietary file format
+
 
 ## License and Copyright
 

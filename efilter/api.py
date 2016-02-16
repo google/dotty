@@ -24,9 +24,12 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 from efilter import query as q
 from efilter import scope
 
+from efilter.protocols import repeated
+
 from efilter.transforms import solve
 from efilter.transforms import infer_type
 
+from efilter.stdlib import core as std_core
 from efilter.stdlib import io as std_io
 
 
@@ -55,6 +58,14 @@ def apply(query, replacements=None, vars=None, allow_io=False):
         return value will be an iterable of filtered data (actually an object
         implementing IRepeated, as well as __iter__.)
 
+    A word on cardinality of the return value:
+        Types in EFILTER always refer to a scalar. If apply returns more than
+        one value, the type returned by 'infer' will refer to the type of
+        the value inside the returned container.
+
+        If you're unsure whether your query returns one or more values (rows),
+        use the 'getvalues' function.
+
     Raises:
         efilter.errors.EfilterError if there are issues with the query.
 
@@ -62,9 +73,9 @@ def apply(query, replacements=None, vars=None, allow_io=False):
         apply("5 + 5") # -> 10
 
         apply("SELECT * FROM people WHERE age > 10",
-              people=({"age": 10, "name": "Bob"},
-                      {"age": 20, "name": "Alice"},
-                      {"age": 30, "name": "Eve"})) # -> LazyRepetition(...)
+              vars={"people":({"age": 10, "name": "Bob"},
+                              {"age": 20, "name": "Alice"},
+                              {"age": 30, "name": "Eve"}))
 
         # This will replace the question mark (?) with the string "Bob" in a
         # safe manner, preventing SQL injection.
@@ -82,7 +93,73 @@ def apply(query, replacements=None, vars=None, allow_io=False):
     return results
 
 
-def infer(query, replacements=None, root_type=None):
+def getvalues(result):
+    """Return an iterator of results of 'apply'.
+
+    The 'apply' function can return one or more values, depending on the query.
+    If you are unsure whether your query evaluates to a scalar or a collection
+    of scalars, 'getvalues' will always return an iterator with one or more
+    elements.
+
+    Arguments:
+        result: Anything. If it's an instance of IRepeated, all values will be
+            returned.
+
+    Returns:
+        An iterator of at least one element.
+    """
+    return repeated.getvalues(result)
+
+
+def user_func(func, arg_types=None, return_type=None):
+    """Create an EFILTER-callable version of function 'func'.
+
+    As a security precaution, EFILTER will not execute Python callables
+    unless they implement the IApplicative protocol. There is a perfectly good
+    implementation of this protocol in the standard library and user functions
+    can inherit from it.
+
+    This will declare a subclass of the standard library TypedFunction and
+    return an instance of it that EFILTER will happily call.
+
+    Arguments:
+        func: A Python callable that will serve as the implementation.
+        arg_types (optional): A tuple of argument types. If the function takes
+            keyword arguments, they must still have a defined order.
+        return_type (optional): The type the function returns.
+
+    Returns:
+        An instance of a custom subclass of efilter.stdlib.core.TypedFunction.
+
+    Examples:
+        def my_callback(tag):
+            print("I got %r" % tag)
+
+        api.apply("if True then my_callback('Hello World!')",
+                  vars={
+                    "my_callback": api.user_func(my_callback)
+                  })
+
+        # This should print "I got 'Hello World!'".
+    """
+    class UserFunction(std_core.TypedFunction):
+        name = func.__name__
+
+        def __call__(self, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        @classmethod
+        def reflect_static_args(cls):
+            return arg_types
+
+        @classmethod
+        def reflect_static_return(cls):
+            return return_type
+
+    return UserFunction()
+
+
+def infer(query, replacements=None, root_type=None, allow_io=False):
     """Determine the type of the query's output without actually running it.
 
     Arguments:
@@ -90,6 +167,7 @@ def infer(query, replacements=None, root_type=None):
         replacements: Built-time parameters to the query, either as dict or as
             an array (for positional interpolation).
         root_type: The types of variables to be supplied to the query inference.
+        allow_io: Whether the inference should include IO functions.
 
     Returns:
         The type of the query's output, if it can be determined. If undecidable,
@@ -108,8 +186,16 @@ def infer(query, replacements=None, root_type=None):
         # If root_type implements the IStructured reflection API:
         infer("SELECT * FROM people WHERE age > 10", root_type=...) # -> dict
     """
+    if root_type:
+        type_scope = scope.ScopeStack(std_core.MODULE, root_type)
+    else:
+        type_scope = scope.ScopeStack(std_core.MODULE)
+
+    if allow_io:
+        type_scope = scope.ScopeStack(std_io.MODULE, type_scope)
+
     query = q.Query(query, params=replacements)
-    return infer_type.infer_type(query, root_type)
+    return infer_type.infer_type(query, type_scope)
 
 
 def search(query, data, replacements=None):

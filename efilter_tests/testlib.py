@@ -34,7 +34,7 @@ TEST_COVERAGE = True
 
 
 def get_fixture_path(name):
-    return os.path.join("efilter_tests", "fixtures", name)
+    return os.path.join("sample_data", name)
 
 
 class EfilterTestCase(unittest.TestCase):

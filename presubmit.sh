@@ -28,9 +28,12 @@ for f in $( git diff master --name-only | grep ".py"); do
   fi
 done
 
-echo "Running unittest discover on efilter_tests..."
-# Run the unit test suite.
-python -m unittest discover efilter_tests -p "*"
 
-# Run the benchmarks.
-PYTHONPATH=./ efilter_tests/run_benchmarks.py
+echo "Running tests..."
+tox -- python -m unittest discover efilter_tests -p "*"
+
+echo "Cleaning up..."
+rm -rf efilter.egg-info/ .cache/
+find . -iname "*.pyc" -delete
+find . -iname __pycache__ -delete
+
