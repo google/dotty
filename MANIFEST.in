@@ -1,1 +1,2 @@
-include version.txt
+include AUTHORS.txt LICENSE.txt README.md version.txt
+recursive-include dpkg *
