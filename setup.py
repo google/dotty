@@ -12,10 +12,18 @@ try:
 except ImportError:
   from distutils.command.bdist_rpm import bdist_rpm
 
+try:
+  from setuptools.command.sdist import sdist
+except ImportError:
+  from distutils.command.sdist import sdist
+
 # Change PYTHONPATH to include efilter so that we can get the version.
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
 from efilter import version
+
+
+__version__ = open("version.txt").read().strip()
 
 
 class BdistRPMCommand(bdist_rpm):
@@ -34,42 +42,42 @@ class BdistRPMCommand(bdist_rpm):
       spec_file = bdist_rpm._make_spec_file(self)
 
     if sys.version_info[0] < 3:
-      python_package = 'python'
+      python_package = "python"
     else:
-      python_package = 'python3'
+      python_package = "python3"
 
     description = []
-    summary = ''
+    summary = ""
     in_description = False
 
     python_spec_file = []
     for index, line in enumerate(spec_file):
-      if line.startswith('Summary: '):
+      if line.startswith("Summary: "):
         summary = line
 
-      elif line.startswith('BuildRequires: '):
-        line = 'BuildRequires: {0:s}-setuptools'.format(python_package)
+      elif line.startswith("BuildRequires: "):
+        line = "BuildRequires: {0:s}-setuptools".format(python_package)
 
-      elif line.startswith('Requires: '):
-        if python_package == 'python3':
-          line = line.replace('python', 'python3')
+      elif line.startswith("Requires: "):
+        if python_package == "python3":
+          line = line.replace("python", "python3")
 
-      elif line.startswith('%description'):
+      elif line.startswith("%description"):
         in_description = True
 
-      elif line.startswith('%files'):
-        line = '%files -f INSTALLED_FILES -n {0:s}-%{{name}}'.format(
+      elif line.startswith("%files"):
+        line = "%files -f INSTALLED_FILES -n {0:s}-%{{name}}".format(
            python_package)
 
-      elif line.startswith('%prep'):
+      elif line.startswith("%prep"):
         in_description = False
 
         python_spec_file.append(
-            '%package -n {0:s}-%{{name}}'.format(python_package))
-        python_spec_file.append('{0:s}'.format(summary))
-        python_spec_file.append('')
+            "%package -n {0:s}-%{{name}}".format(python_package))
+        python_spec_file.append("{0:s}".format(summary))
+        python_spec_file.append("")
         python_spec_file.append(
-            '%description -n {0:s}-%{{name}}'.format(python_package))
+            "%description -n {0:s}-%{{name}}".format(python_package))
         python_spec_file.extend(description)
 
       elif in_description:
@@ -84,8 +92,22 @@ class BdistRPMCommand(bdist_rpm):
     return python_spec_file
 
 
+class SDistCommand(sdist):
+  """Custom handler for the sdist command."""
+
+  def run(self):
+    global __version__
+    __version__ = "{0:d}".format(version.get_version())
+    with open("version.txt", "w") as fd:
+      fd.write(__version__)
+
+    # Need to use old style super class invocation here for
+    # backwards compatibility.
+    sdist.run(self)
+
+
 setup(name="efilter",
-      version=version.get_version(),
+      version=__version__,
       description="EFILTER query language",
       license="Apache 2.0",
       author="Adam Sindelar",
@@ -93,7 +115,9 @@ setup(name="efilter",
       url="https://github.com/google/dotty/",
       packages=find_packages(exclude=["efilter_tests*"]),
       package_dir={"efilter": "efilter"},
-      cmdclass={'bdist_rpm': BdistRPMCommand},
+      cmdclass={
+          "bdist_rpm": BdistRPMCommand,
+          "sdist": SDistCommand},
       install_requires=[
           "python-dateutil > 2",
           "pytz >= 2011k"])
