@@ -81,7 +81,7 @@ Work in progress.
 Several sample projects are provided.
 
  - examples/star_catalog: filters a large CSV file with nearby star systems
- - examples/custom_io: filter a proprietary file format
+ - examples/tagging: use a custom query format
 
 
 ## License and Copyright

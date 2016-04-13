@@ -20,14 +20,14 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import unittest
+from efilter_tests import testlib
 
-from efilter.parsers.dottysql import lexer
+from efilter.parsers.common import tokenizer
 
 
-class LexerTest(unittest.TestCase):
+class TokenizerTest(testlib.EfilterTestCase):
     def assertQueryMatches(self, query, expected):
-        l = lexer.Lexer(query)
+        l = tokenizer.LazyTokenizer(query)
         actual = [(token.name, token.value) for token in l]
         self.assertEqual(expected, actual)
 
@@ -43,6 +43,18 @@ class LexerTest(unittest.TestCase):
 
     def testPrefix(self):
         self.assertQueryMatches("-5", [("symbol", "-"), ("literal", 5)])
+
+    def testCorrectEnd(self):
+        query = "1 + 1 == 2"
+        t = tokenizer.LazyTokenizer(query)
+        while t.next_token():
+            pass
+
+        # Should be exhausted now.
+        self.assertIsNone(t.peek(0))
+
+        # Should be empty now.
+        self.assertEqual(0, len(list(iter(t))))
 
     def testKeywords(self):
         query = "5 + 5 == 10 and 'foo' =~ 'bar'"
@@ -60,7 +72,7 @@ class LexerTest(unittest.TestCase):
 
     def testPeeking(self):
         query = "1 in (5, 10) == foo"
-        l = lexer.Lexer(query)
+        l = tokenizer.LazyTokenizer(query)
         self.assertEqual(l.peek(0).value, 1)
         self.assertEqual(l.peek(2).name, "lparen", None)
         self.assertEqual(l.current_token.value, 1)

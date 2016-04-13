@@ -28,17 +28,16 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 import os
 
 
-# The API module is the easiest way to use EFILTER - the functions,
-# 'apply', 'search' and 'infer', take care of parsing and using the query.
+# The API module is the easiest way to use EFILTER - the functions, 'apply',
+# 'search' and 'infer', take care of parsing and using the query.
 from efilter import api
 
 
-# This is a CSV file with the HYG star catalog in it. A complete list of
-# fields can be found at the astronexus page [1]. Of interest to us are:
+# This is a CSV file with the HYG star catalog in it. A complete list of fields
+# can be found at the astronexus page [1]. Of interest to us are:
 #
-# - "proper": A common name for the star, such as "Sirius".
-# - "dist": The distance in parsecs.
-# - "mag": The star's apparent magnitude.
+# - "proper": A common name for the star, such as "Sirius". - "dist": The
+# distance in parsecs. - "mag": The star's apparent magnitude.
 #
 # 1: https://github.com/astronexus/HYG-Database/blob/master/README.md
 CATALOG_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)),
@@ -70,9 +69,9 @@ QUERIES = [
 
     # EFILTER supports the pseudo-SQL syntax as convenience. The processing
     # is actually accomplished using familiar map/filter/sort functions.
-    ("Get 5 proper names exactly 5 characters in length.",
+    ("Get 3 proper names exactly 6 characters in length.",
      "map("
-     " take(5, filter(csv(?, decode_header:true), count(proper) == 5)),"
+     " take(3, filter(csv(?, decode_header:true), count(proper) == 6)),"
      " proper)")
 ]
 
@@ -95,11 +94,10 @@ def main():
                             replacements=[CATALOG_PATH],
                             allow_io=True,
                             # We provide the top level variables in a 'vars'
-                            # argument. To bind 'parsec2ly' to the function
-                            # of the same name, we have to also wrap it
-                            # in the EFILTER user_func. This prevents EFILTER
-                            # from accidentally calling regular Python
-                            # functions.
+                            # argument. To bind 'parsec2ly' to the function of
+                            # the same name, we have to also wrap it in the
+                            # EFILTER user_func. This prevents EFILTER from
+                            # accidentally calling regular Python functions.
                             vars={"parsec2ly": api.user_func(parsec2ly)})
 
         # Because we don't know the cardinality of the query in 'query' we can

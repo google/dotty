@@ -20,15 +20,14 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import six
-import unittest
+from efilter_tests import testlib
 
 from efilter import query
 
 from efilter.transforms import asdottysql
 
 
-class AsDottySQLTest(unittest.TestCase):
+class AsDottySQLTest(testlib.EfilterTestCase):
     def testQuery(self):
         """Get coverage test to shut up."""
         pass
@@ -38,13 +37,12 @@ class AsDottySQLTest(unittest.TestCase):
         pass
 
     def assertOutput(self, original, output):
-        if isinstance(original, six.string_types):
-            q = query.Query(original)
-        else:
-            q = query.Query(original)
-
+        q = query.Query(original)
         actual_output = asdottysql.asdottysql(q)
         self.assertEqual(output, actual_output)
+
+        actual_root = query.Query(actual_output).root
+        self.assertEqual(q.root, actual_root)
 
     def testLiteral(self):
         self.assertOutput(original="5", output="5")
@@ -63,7 +61,7 @@ class AsDottySQLTest(unittest.TestCase):
 
     def testMap(self):
         self.assertOutput(
-            original=("map", ("map", ("var", "x"), ("var", "y")), ("var", "z")),
+            original=(".", (".", ("var", "x"), "y"), "z"),
             output="x.y.z")
 
     def testNumericExpression(self):
@@ -103,7 +101,7 @@ class AsDottySQLTest(unittest.TestCase):
             output="not (5 + 5)")
 
         self.assertOutput(
-            original=("!", ("map", ("var", "x"), ("var", "y"))),
+            original=("!", (".", ("var", "x"), "y")),
             output="not x.y")
 
     def testReverse(self):

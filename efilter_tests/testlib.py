@@ -21,6 +21,7 @@ EFILTER test helpers.
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import os
+import subprocess
 import unittest
 
 from efilter import protocol
@@ -38,6 +39,24 @@ def get_fixture_path(name):
 
 
 class EfilterTestCase(unittest.TestCase):
+    def runPythonScript(self, script_path, args=()):
+        cmd = [os.path.join(os.getcwd(), script_path)]
+        cmd.extend(args)
+        proc = subprocess.Popen(args=cmd,
+                                env={"PYTHONPATH": os.getcwd()},
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        err = proc.returncode
+
+        return err, stdout, stderr
+
+    def assertPythonScript(self, script_path, args=()):
+        err, stdout, stderr = self.runPythonScript(script_path, args)
+
+        self.assertEqual(err, 0)
+        return stdout, stderr
+
     def assertImplemented(self, for_type, function):
         self.assertTrue(function.implemented_for_type(for_type),
                         "Multimethod %r is not implemented for %r." %

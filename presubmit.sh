@@ -2,6 +2,8 @@
 
 # Find the top-level dir and change to it:
 
+echo "PRESUBMIT: Trying to find working directory..."
+
 # Change working dir to one containing this script.
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
@@ -12,14 +14,14 @@ do
 
   if [[ "$(pwd)" == "/" ]]
   then
-    echo "Cannot find top level directory."
+    echo "PRESUBMIT: Cannot find top level directory."
     exit -1
   fi
 done
 
-echo "Working directory is $(pwd)"
+echo "PRESUBMIT: Working directory is $(pwd)"
 
-echo "Going to run pylint and autopep8 now..."
+echo "PRESUBMIT: Going to run pylint and autopep8 now..."
 for f in $( git diff master --name-only | grep ".py"); do
   if [ -e $f ]; then
     echo "Validating and reformatting $f"
@@ -29,11 +31,15 @@ for f in $( git diff master --name-only | grep ".py"); do
 done
 
 
-echo "Running tests..."
+echo "PRESUBMIT: Running EFILTER tests..."
 tox -- python -m unittest discover efilter_tests -p "*"
 
-echo "Cleaning up..."
+echo "PRESUBMIT: Running end-to-end and sample code tests..."
+tox -- python -m unittest discover sample_projects -p "*_test*"
+
+echo "PRESUBMIT: Cleaning up..."
 rm -rf efilter.egg-info/ .cache/
+rm -rf .tox
 find . -iname "*.pyc" -delete
 find . -iname __pycache__ -delete
 

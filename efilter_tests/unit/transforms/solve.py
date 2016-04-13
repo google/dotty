@@ -158,30 +158,26 @@ class SolveTest(testlib.EfilterTestCase):
             5)
 
     def testEach(self):
-        self.assertEqual(
+        self.assertFalse(
             solve.solve(
                 q.Query("each(Process.parent, (pid == 1))"),
                 {"Process": {"parent": superposition.superposition(
                     mocks.Process(1, None, None),
-                    mocks.Process(2, None, None))}}).value,
-            False)
+                    mocks.Process(2, None, None))}}).value)
 
     def testAny(self):
-        self.assertEqual(
+        self.assertTrue(
             solve.solve(
                 q.Query("any Process.parent where (pid == 1)"),
                 {"Process": {"parent": superposition.superposition(
                     mocks.Process(1, None, None),
-                    mocks.Process(2, None, None))}}).value,
-            True)
+                    mocks.Process(2, None, None))}}).value)
 
         # Test that unary ANY works as expected.
         query = q.Query(ast.Any(ast.Var("x")))
-        self.assertEqual(solve.solve(query, {"x": None}).value, False)
-        self.assertEqual(solve.solve(query, {"x": 1}).value, True)
-        self.assertEqual(solve.solve(query,
-                                     {"x": repeated.meld(1, 2, 3)}).value,
-                         True)
+        self.assertFalse(solve.solve(query, {"x": None}).value)
+        self.assertTrue(solve.solve(query, {"x": 1}).value)
+        self.assertTrue(solve.solve(query, {"x": repeated.meld(1, 2, 3)}).value)
 
     def testSort(self):
         self.assertEqual(
@@ -267,25 +263,14 @@ class SolveTest(testlib.EfilterTestCase):
                 error_f=lambda e: "Cannot find type named 'FooBar'" in str(e)):
             solve.solve(q.Query("proc isa FooBar"), mocks.MockRootType())
 
-        self.assertEqual(
-            solve.solve(
-                q.Query("proc isa Process"),
-                mocks.MockRootType()).value,
-            True)
+        self.assertTrue(solve.solve(q.Query("proc isa Process"),
+                                    mocks.MockRootType()).value)
 
         # Builtin types should work, too.
-        self.assertEqual(
-            solve.solve(
-                q.Query("5 isa int"),
-                {}).value,
-            True)
+        self.assertTrue(solve.solve(q.Query("5 isa int"), {}).value)
 
         # Always never forget to test for negatives.
-        self.assertEqual(
-            solve.solve(
-                q.Query("5 isa str"),
-                {}).value,
-            False)
+        self.assertFalse(solve.solve(q.Query("5 isa str"), {}).value)
 
     def testCast(self):
         self.assertEqual(
@@ -295,25 +280,16 @@ class SolveTest(testlib.EfilterTestCase):
             "5")
 
     def testComplement(self):
-        self.assertEqual(
-            solve.solve(
-                q.Query("not pid"),
-                mocks.Process(1, None, None)).value,
-            False)
+        self.assertFalse(solve.solve(q.Query("not pid"),
+                                     mocks.Process(1, None, None)).value)
 
     def testIntersection(self):
-        self.assertEqual(
-            solve.solve(
-                q.Query("pid and not pid"),
-                mocks.Process(1, None, None)).value,
-            False)
+        self.assertFalse(solve.solve(q.Query("pid and not pid"),
+                                     mocks.Process(1, None, None)).value)
 
     def testUnion(self):
-        self.assertEqual(
-            solve.solve(
-                q.Query("pid or not pid"),
-                mocks.Process(1, None, None)).value,
-            True)
+        self.assertTrue(solve.solve(q.Query("pid or not pid"),
+                                    mocks.Process(1, None, None)).value)
 
     def testSum(self):
         self.assertEqual(
@@ -344,25 +320,22 @@ class SolveTest(testlib.EfilterTestCase):
             2.5)
 
     def testEquivalence(self):
-        self.assertEqual(
-            solve.solve(
-                q.Query("pid == 1"),
-                mocks.Process(1, None, None)).value,
-            True)
+        self.assertTrue(solve.solve(q.Query("pid == 1"),
+                                    mocks.Process(1, None, None)).value)
 
     def testMembership(self):
-        self.assertEqual(
-            solve.solve(
-                q.Query("pid in [1, 2]"),
-                mocks.Process(1, None, None)).value,
-            True)
+        self.assertTrue(solve.solve(q.Query("pid in [1, 2]"),
+                                    mocks.Process(1, None, None)).value)
 
         # Repeated should work, too.
-        self.assertEqual(
-            solve.solve(
-                q.Query("pid in (1, 2)"),
-                mocks.Process(1, None, None)).value,
-            True)
+        self.assertTrue(solve.solve(q.Query("pid in (1, 2)"),
+                                    mocks.Process(1, None, None)).value)
+
+        # Strings can be in strings.
+        self.assertTrue(solve.solve(q.Query("'foo' in 'foobar'"), {}).value)
+
+        # True negative.
+        self.assertFalse(solve.solve(q.Query("'foo' in 'bar'"), {}).value)
 
     def testRegexFilter(self):
         self.assertTrue(
@@ -371,18 +344,12 @@ class SolveTest(testlib.EfilterTestCase):
                 mocks.Process(1, "initd", None)).value)
 
     def testStrictOrderedSet(self):
-        self.assertEqual(
-            solve.solve(
-                q.Query("pid > 2"),
-                mocks.Process(1, None, None)).value,
-            False)
+        self.assertFalse(solve.solve(q.Query("pid > 2"),
+                                     mocks.Process(1, None, None)).value)
 
     def testPartialOrderedSet(self):
-        self.assertEqual(
-            solve.solve(
-                q.Query("pid >= 2"),
-                mocks.Process(2, None, None)).value,
-            True)
+        self.assertTrue(solve.solve(q.Query("pid >= 2"),
+                                    mocks.Process(2, None, None)).value)
 
     def testMatchTrace(self):
         """Make sure that matching branch is recorded where applicable."""
@@ -397,7 +364,7 @@ class SolveTest(testlib.EfilterTestCase):
     def testDestructuring(self):
         result = solve.solve(
             q.Query("Process.pid == 1"), {"Process": {"pid": 1}})
-        self.assertEqual(True, result.value)
+        self.assertTrue(result.value)
 
         # Using a let-any form should succeed even if there is only one linked
         # object.
@@ -405,4 +372,4 @@ class SolveTest(testlib.EfilterTestCase):
             q.Query("any Process.parent where (Process.pid == 1 or "
                     "Process.command == 'foo')"),
             {"Process": {"parent": {"Process": {"pid": 1}}}})
-        self.assertEqual(True, result.value)
+        self.assertTrue(result.value)

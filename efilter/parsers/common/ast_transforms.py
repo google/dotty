@@ -15,19 +15,29 @@
 # limitations under the License.
 
 """
-This module contains functions that map consructs in DottySQL to the AST.
+This module contains functions that map consructs in common grammars to the AST.
 
-Most constructs in DottySQL map directly to something in the EFILTER AST, but
-some constructs don't. For example, EFILTER supports a Complement ('NOT') and
-an Equivalence ('=='), but not a non-Equivalence ('!='), therefore, this module
-contains a function that simulates a non-Equivalence AST node by transforming
-it to a Completement of Equivalence.
+Most constructs in expression grammars map directly to something in the EFILTER
+AST, but some constructs don't. For example, EFILTER supports a
+Complement ('NOT') and an Equivalence ('=='), but not a non-Equivalence ('!='),
+therefore, this module contains a function that simulates a non-Equivalence
+AST node by transforming it to a Completement of Equivalence.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 
 from efilter import ast
+
+
+def NormalizeResolve(x, y, **kwargs):
+    if isinstance(y, ast.Var):
+        literal_y = ast.Literal(y.value, start=y.start, end=y.end,
+                                source=y.source)
+    else:
+        raise TypeError("Type of RHS must be Var. Got %r." % y)
+
+    return ast.Resolve(x, literal_y, **kwargs)
 
 
 def ComplementEquivalence(*args, **kwargs):
@@ -40,6 +50,17 @@ def ComplementMembership(*args, **kwargs):
     """Change (x not in y) to not(x in y)."""
     return ast.Complement(
         ast.Membership(*args, **kwargs), **kwargs)
+
+
+def ReverseMembership(x, y, **kwargs):
+    """Change (x contains y) to y in x."""
+    return ast.Membership(y, x, **kwargs)
+
+
+def ReverseComplementMembership(x, y, **kwargs):
+    """Change (x doesn't contain y) to not(y in x)."""
+    return ast.Complement(
+        ast.Membership(y, x, **kwargs), **kwargs)
 
 
 def ReverseStrictOrderedSet(*args, **kwargs):

@@ -30,48 +30,11 @@ from efilter import query as q
 from efilter.parsers.dottysql import grammar
 
 
-def __build_operator_lookup(table):
-    lookup = {}
-    for operator in six.itervalues(table):
-        if not (isinstance(operator.handler, type) and
-                issubclass(operator.handler, ast.Expression)):
-            continue
-
-        lookup[operator.handler] = operator
-
-    return lookup
-
-
-@dispatch.memoize
-def infix():
-    return __build_operator_lookup(grammar.INFIX)
-
-
-@dispatch.memoize
-def prefix():
-    return __build_operator_lookup(grammar.PREFIX)
-
-
-@dispatch.memoize
-def mixfix():
-    return __build_operator_lookup(grammar.MIXFIX)
-
-
-@dispatch.memoize
-def operators():
-    result = {}
-    result.update(infix())
-    result.update(prefix())
-    result.update(mixfix())
-
-    return result
-
-
 BUILTINS = dict((v, k) for k, v in six.iteritems(grammar.BUILTINS))
 
 
 def __expression_precedence(expr):
-    operator = operators().get(type(expr))
+    operator = grammar.OPERATORS.by_handler.get(type(expr))
     if operator:
         return operator.precedence, operator.assoc
 
@@ -117,7 +80,7 @@ def asdottysql_map(expr):
 @asdottysql.implementation(for_types=(ast.NumericExpression, ast.Relation,
                                       ast.LogicalOperation))
 def asdottysql_operator(expr):
-    operator = infix()[type(expr)]
+    operator = grammar.OPERATORS.by_handler[type(expr)]
     children = []
 
     for child in expr.children:
@@ -159,12 +122,12 @@ def asdottysql(expr):
             and len(expr.value.children) == 2):
         return _format_binary(expr.value.children[0],
                               expr.value.children[1],
-                              grammar.INFIX["!="])
+                              grammar.OPERATORS.by_name["!="])
 
     if isinstance(expr.value, ast.Membership):
         return _format_binary(expr.value.children[0],
                               expr.value.children[1],
-                              grammar.INFIX["not in"])
+                              grammar.OPERATORS.by_name["not in"])
 
     child_precedence, assoc = __expression_precedence(expr.value)
 
@@ -185,13 +148,15 @@ def asdottysql(expr):
 
 @asdottysql.implementation(for_type=ast.Pair)
 def asdottysql(expr):
-    return _format_binary(expr.lhs, expr.rhs, grammar.INFIX[":"], lspace="")
+    return _format_binary(expr.lhs, expr.rhs, grammar.OPERATORS.by_name[":"],
+                          lspace="")
 
 
 @asdottysql.implementation(for_types=(ast.IsInstance, ast.RegexFilter,
                                       ast.Membership))
 def asdottysql(expr):
-    return _format_binary(expr.lhs, expr.rhs, infix()[type(expr)])
+    return _format_binary(expr.lhs, expr.rhs,
+                          grammar.OPERATORS.by_handler[type(expr)])
 
 
 @asdottysql.implementation(for_type=ast.Apply)
@@ -222,7 +187,8 @@ def asdottysql(expr):
         return "<expression cannot be formatted as DottySQL>"
 
     return _format_binary(expr.lhs, ast.Var(expr.rhs.value),
-                          infix()[ast.Resolve], lspace="", rspace="")
+                          grammar.OPERATORS.by_handler[ast.Resolve], lspace="",
+                          rspace="")
 
 
 @asdottysql.implementation(for_type=ast.Repeat)

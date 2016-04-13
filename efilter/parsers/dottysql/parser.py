@@ -27,7 +27,7 @@ expression = atom | binary_expression .
 
 binary_expression =
     atom { [ infix_operator atom ] }
-    | atom { [ mixfix_operator expression postfix ] }
+    | atom { [ mixfix_operator expression suffix ] }
 
 atom =
     [ prefix ]
@@ -64,7 +64,10 @@ from efilter import errors
 from efilter import syntax
 
 from efilter.parsers.dottysql import grammar
-from efilter.parsers.dottysql import lexer
+
+from efilter.parsers.common import grammar as common_grammar
+from efilter.parsers.common import tokenizer
+from efilter.parsers.common import token_stream
 
 
 class Parser(syntax.Syntax):
@@ -74,12 +77,15 @@ class Parser(syntax.Syntax):
     precedence climbing.
     """
 
-    last_match = grammar.TokenMatch(None, None, None)
+    last_match = common_grammar.TokenMatch(None, None, None)
     last_param = 0
+    tokens = None
 
     def __init__(self, original, params=None):
         super(Parser, self).__init__(original)
-        self.lexer = lexer.Lexer(self.original)
+
+        self.tokens = token_stream.TokenStream(
+            tokenizer.LazyTokenizer(self.original))
 
         if isinstance(params, list):
             self.params = {}
@@ -102,8 +108,8 @@ class Parser(syntax.Syntax):
             e.query = self.original
             raise
 
-        if self.lexer.peek(0):
-            token = self.lexer.peek(0)
+        if self.tokens.peek(0):
+            token = self.tokens.peek(0)
             return self.error(
                 "Unexpected %s '%s'. Were you looking for an operator?" %
                 (token.name, token.value),
@@ -115,77 +121,8 @@ class Parser(syntax.Syntax):
     def root(self):
         return self.parse()
 
-    # Convenience accessors.
-
-    @property
-    def matched_operator(self):
-        return self.last_match.operator
-
-    @property
-    def matched_value(self):
-        return self.last_match.value
-
-    @property
-    def matched_tokens(self):
-        return self.last_match.tokens
-
-    @property
-    def matched_start(self):
-        return self.last_match.tokens[0].start
-
-    @property
-    def matched_end(self):
-        return self.last_match.tokens[0].end
-
-    @property
-    def matched_wide_end(self):
-        return self.last_match.tokens[-1].end
-
-    def match(self, f):
-        try:
-            match = f(self.lexer)
-        except StopIteration:
-            # Some functions try to match multiple tokens towards the end of
-            # input and end up going past the end of the query. That's alright.
-            return
-
-        if not match:
-            return
-
-        self.last_match = match
-        return match
-
-    def accept(self, f):
-        match = self.match(f)
-        if not match:
-            return
-
-        self.lexer.skip(len(self.matched_tokens))
-        return match
-
-    def expect(self, f):
-        match = self.accept(f)
-        if match:
-            return match
-
-        try:
-            func_name = f.func_name
-        except AttributeError:
-            func_name = "<unnamed grammar construct>"
-
-        return self.error(
-            start_token=self.lexer.peek(0),
-            message="Was expecting a %s here." % func_name)
-
-    def reject(self, f):
-        match = self.match(f)
-        if match:
-            token = self.lexer.peek(0)
-            return self.error("Was not expecting a %s here." % token.name,
-                              token)
-
     def error(self, message=None, start_token=None, end_token=None):
-        start = self.lexer.position
+        start = self.tokens.tokenizer.position
         end = start + 20
         if start_token:
             start = start_token.start
@@ -228,118 +165,123 @@ class Parser(syntax.Syntax):
                 | "(" expression ")" ) .
         """
         # Parameter replacement with literals.
-        if self.accept(grammar.param):
+        if self.tokens.accept(grammar.param):
             return self.param()
 
         # At the top level, we try to see if we are recursing into an SQL query.
-        if self.accept(grammar.select):
+        if self.tokens.accept(grammar.select):
             return self.select()
 
         # A SELECT query can also start with 'ANY'.
-        if self.accept(grammar.select_any):
+        if self.tokens.accept(grammar.select_any):
             return self.select_any()
 
         # Explicitly reject any keywords from SQL other than SELECT and ANY.
         # If we don't do this they will match as valid symbols (variables)
         # and that might be confusing to the user.
-        self.reject(grammar.sql_keyword)
+        self.tokens.reject(grammar.sql_keyword)
 
         # Match if-else before other things that consume symbols.
-        if self.accept(grammar.if_if):
+        if self.tokens.accept(grammar.if_if):
             return self.if_if()
 
         # Operators must be matched first because the same symbols could also
         # be vars or applications.
-        if self.accept(grammar.prefix):
-            operator = self.matched_operator
-            start = self.matched_start
+        if self.tokens.accept(grammar.prefix):
+            operator = self.tokens.matched.operator
+            start = self.tokens.matched.start
             expr = self.expression(operator.precedence)
             return operator.handler(expr, start=start, end=expr.end,
                                     source=self.original)
 
-        if self.accept(grammar.literal):
-            return ast.Literal(self.matched_value, source=self.original,
-                               start=self.matched_start, end=self.matched_end)
+        if self.tokens.accept(grammar.literal):
+            return ast.Literal(self.tokens.matched.value, source=self.original,
+                               start=self.tokens.matched.start,
+                               end=self.tokens.matched.end)
 
         # Match builtin pseudo-functions before functions and vars to prevent
         # overrides.
-        if self.accept(grammar.builtin):
-            return self.builtin(self.matched_value)
+        if self.tokens.accept(grammar.builtin):
+            return self.builtin(self.tokens.matched.value)
 
         # Match applications before vars, because obviously.
-        if self.accept(grammar.application):
+        if self.tokens.accept(grammar.application):
             return self.application(
-                ast.Var(self.matched_value, source=self.original,
-                        start=self.matched_start, end=self.matched_end))
+                ast.Var(self.tokens.matched.value, source=self.original,
+                        start=self.tokens.matched.start,
+                        end=self.tokens.matched.end))
 
-        if self.accept(grammar.symbol):
-            return ast.Var(self.matched_value, source=self.original,
-                           start=self.matched_start, end=self.matched_end)
+        if self.tokens.accept(common_grammar.symbol):
+            return ast.Var(self.tokens.matched.value, source=self.original,
+                           start=self.tokens.matched.start,
+                           end=self.tokens.matched.end)
 
-        if self.accept(grammar.lparen):
+        if self.tokens.accept(common_grammar.lparen):
             # Parens will contain one or more expressions. If there are several
             # expressions, separated by commas, then they are a repeated value.
             #
             # Unlike lists, repeated values must all be of the same type,
             # otherwise evaluation of the query will fail at runtime (or
             # type-check time, for simple cases.)
-            start = self.matched_start
+            start = self.tokens.matched.start
             expressions = [self.expression()]
 
-            while self.accept(grammar.comma):
+            while self.tokens.accept(common_grammar.comma):
                 expressions.append(self.expression())
 
-            self.expect(grammar.rparen)
+            self.tokens.expect(common_grammar.rparen)
 
             if len(expressions) == 1:
                 return expressions[0]
             else:
                 return ast.Repeat(*expressions, source=self.original,
-                                  start=start, end=self.matched_end)
+                                  start=start, end=self.tokens.matched.end)
 
-        if self.accept(grammar.lbracket):
+        if self.tokens.accept(common_grammar.lbracket):
             return self.list()
 
-        if self.lexer.peek(0):
+        # We've run out of things we know the next atom could be. If there is
+        # still input left then it's illegal syntax. If there is nothing then
+        # the input cuts off when we still need an atom. Either is an error.
+        if self.tokens.peek(0):
             return self.error(
-                "Was not expecting %r here." % self.lexer.peek(0).name,
-                start_token=self.lexer.peek(0))
+                "Was not expecting %r here." % self.tokens.peek(0).name,
+                start_token=self.tokens.peek(0))
         else:
             return self.error("Unexpected end of input.")
 
     def param(self):
-        if self.matched_value is None:
+        if self.tokens.matched.value is None:
             param = self.last_param
             self.last_param += 1
-        elif isinstance(self.matched_value, int):
-            param = self.last_param = self.matched_value
-        elif isinstance(self.matched_value, six.string_types):
-            param = self.matched_value
+        elif isinstance(self.tokens.matched.value, int):
+            param = self.last_param = self.tokens.matched.value
+        elif isinstance(self.tokens.matched.value, six.string_types):
+            param = self.tokens.matched.value
         else:
             return self.error(
-                "Invalid param %r." % self.matched_value,
-                start_token=self.matched_tokens[0])
+                "Invalid param %r." % self.tokens.matched.value,
+                start_token=self.tokens.matched.first)
 
         if param not in self.params:
             return self.error(
                 "Param %r unavailable. (Available: %r)" % (param, self.params),
-                start_token=self.matched_tokens[0])
+                start_token=self.tokens.matched.first)
 
-        return ast.Literal(self.params[param], start=self.matched_start,
-                           end=self.matched_end, source=self.original)
+        return ast.Literal(self.params[param], start=self.tokens.matched.start,
+                           end=self.tokens.matched.end, source=self.original)
 
     def accept_operator(self, precedence):
         """Accept the next binary operator only if it's of higher precedence."""
-        match = grammar.binary_operator(self.lexer)
+        match = grammar.infix(self.tokens)
         if not match:
             return
 
         if match.operator.precedence < precedence:
             return
 
-        self.last_match = match
-        self.lexer.skip(len(self.matched_tokens))
-        return match
+        # The next thing is an operator that we want. Now match it for real.
+        return self.tokens.accept(grammar.infix)
 
     def operator(self, lhs, min_precedence):
         """Climb operator precedence as long as there are operators.
@@ -353,21 +295,21 @@ class Parser(syntax.Syntax):
         This supports both left- and right-associativity. The only part of the
         code that's not a regular precedence-climber deals with mixfix
         operators. A mixfix operator in DottySQL consists of an infix part
-        and a postfix (they are still binary, they just have a terminator).
+        and a suffix (they are still binary, they just have a terminator).
         """
 
         # Spin as long as the next token is an operator of higher
         # precedence. (This may not do anything, which is fine.)
         while self.accept_operator(precedence=min_precedence):
-            operator = self.matched_operator
+            operator = self.tokens.matched.operator
 
             # If we're parsing a mixfix operator we can keep going until
-            # the postfix.
-            if operator.postfix:
+            # the suffix.
+            if operator.suffix:
                 rhs = self.expression()
-                self.expect(operator.postfix)
-                rhs.end = self.matched_end
-            elif operator == grammar.INFIX["."]:
+                self.tokens.expect(common_grammar.match_tokens(operator.suffix))
+                rhs.end = self.tokens.matched.end
+            elif operator.name == ".":
                 # The dot operator changes the meaning of RHS.
                 rhs = self.dot_rhs()
             else:
@@ -381,10 +323,12 @@ class Parser(syntax.Syntax):
             if operator.assoc == "left":
                 next_min_precedence += 1
 
-            while self.match(grammar.binary_operator):
-                if self.matched_operator.precedence < next_min_precedence:
+            while self.tokens.match(grammar.infix):
+                if (self.tokens.matched.operator.precedence
+                        < next_min_precedence):
                     break
-                rhs = self.operator(rhs, self.matched_operator.precedence)
+                rhs = self.operator(rhs,
+                                    self.tokens.matched.operator.precedence)
 
             lhs = operator.handler(lhs, rhs, start=lhs.start, end=rhs.end,
                                    source=self.original)
@@ -397,58 +341,59 @@ class Parser(syntax.Syntax):
         The RHS must be a symbol token, but it is interpreted as a literal
         string (because that's what goes in the AST of Resolve.)
         """
-        self.expect(grammar.symbol)
-        return ast.Literal(self.matched_value, start=self.matched_start,
-                           end=self.matched_end, source=self.original)
+        self.tokens.expect(common_grammar.symbol)
+        return ast.Literal(self.tokens.matched.value,
+                           start=self.tokens.matched.start,
+                           end=self.tokens.matched.end, source=self.original)
 
     # SQL subgrammar:
 
     def select(self):
         """First part of an SQL query."""
         # Try to match the asterisk, any or list of vars.
-        if self.accept(grammar.select_any):
+        if self.tokens.accept(grammar.select_any):
             return self.select_any()
 
-        if self.accept(grammar.select_all):
+        if self.tokens.accept(grammar.select_all):
             # The FROM after SELECT * is required.
-            self.expect(grammar.select_from)
+            self.tokens.expect(grammar.select_from)
             return self.select_from()
 
         return self.select_what()
 
     def select_any(self):
-        saved_match = self.last_match
+        saved_match = self.tokens.matched
         # Any can be either a start of a pseudosql query or the any builtin.
-        if self.match(grammar.lparen):
-            self.last_match = saved_match
+        if self.tokens.match(common_grammar.lparen):
+            self.tokens.matched = saved_match
             # The paren means we're calling 'any(...)' - the builtin.
-            return self.builtin(self.matched_value)
+            return self.builtin(self.tokens.matched.value)
 
         # An optional FROM can go after ANY.
         # "SELECT ANY FROM", "ANY FROM", "SELECT ANY" and just "ANY" all mean
         # the exact same thing. The full form of SELECT ANY FROM is preferred
         # but the shorthand is very useful for writing boolean indicators and
         # so it's worth allowing it.
-        start = self.matched_start
-        self.accept(grammar.select_from)
+        start = self.tokens.matched.start
+        self.tokens.accept(grammar.select_from)
 
         source_expression = self.expression()
 
-        if self.accept(grammar.select_where):
+        if self.tokens.accept(grammar.select_where):
             map_expression = self.expression()
         else:
             map_expression = None
 
         # ORDER after ANY doesn't make any sense.
-        self.reject(grammar.select_order)
+        self.tokens.reject(grammar.select_order)
 
         if map_expression:
             return ast.Any(source_expression, map_expression,
                            start=start, end=map_expression.end,
                            source=self.original)
 
-        return ast.Any(source_expression, start=start, end=self.matched_end,
-                       source=self.original)
+        return ast.Any(source_expression, start=start,
+                       end=self.tokens.matched.end, source=self.original)
 
     def _guess_name_of(self, expr):
         """Tries to guess what variable name 'expr' ends in."""
@@ -463,25 +408,25 @@ class Parser(syntax.Syntax):
     def select_what(self):
         # Each value we select is in form EXPRESSION [AS SYMBOL]. Values are
         # separated by commas.
-        start = self.matched_start
+        start = self.tokens.matched.start
         used_names = set()  # Keeps track of named values to prevent duplicates.
         vars = []
         for watermark in itertools.count():
             value_expression = self.expression()
 
-            if self.accept(grammar.select_as):
+            if self.tokens.accept(grammar.select_as):
                 # If there's an AS then we have an explicit name for this value.
-                self.expect(grammar.symbol)
+                self.tokens.expect(common_grammar.symbol)
 
-                if self.matched_value in used_names:
+                if self.tokens.matched.value in used_names:
                     return self.error(
-                        "Duplicate 'AS' name %r." % self.matched_value)
+                        "Duplicate 'AS' name %r." % self.tokens.matched.value)
 
-                key_expression = ast.Literal(self.matched_value,
-                                             start=self.matched_start,
-                                             end=self.matched_wide_end,
+                key_expression = ast.Literal(self.tokens.matched.value,
+                                             start=self.tokens.matched.start,
+                                             end=self.tokens.matched.end,
                                              source=self.original)
-                used_names.add(self.matched_value)
+                used_names.add(self.tokens.matched.value)
             else:
                 # If the value expression is a map of var (x.y.z...) then
                 # we can guess the name from the last var.
@@ -500,7 +445,7 @@ class Parser(syntax.Syntax):
                                  start=value_expression.start, end=end,
                                  source=self.original))
 
-            if self.accept(grammar.select_from):
+            if self.tokens.accept(grammar.select_from):
                 # Make ast.Bind here.
                 source_expression = self.select_from()
                 return ast.Map(
@@ -508,81 +453,81 @@ class Parser(syntax.Syntax):
                     ast.Bind(*vars, start=start, end=vars[-1].end,
                              source=self.original),
                     start=start,
-                    end=self.matched_end,
+                    end=self.tokens.matched.end,
                     source=self.original)
 
-            self.expect(grammar.comma)
+            self.tokens.expect(common_grammar.comma)
 
     def select_from(self):
         source_expression = self.expression()
-        if self.accept(grammar.select_where):
+        if self.tokens.accept(grammar.select_where):
             return self.select_where(source_expression)
 
-        if self.accept(grammar.select_order):
+        if self.tokens.accept(grammar.select_order):
             return self.select_order(source_expression)
 
-        if self.accept(grammar.select_limit):
+        if self.tokens.accept(grammar.select_limit):
             return self.select_limit(source_expression)
 
         return source_expression
 
     def select_where(self, source_expression):
-        start = self.matched_start
+        start = self.tokens.matched.start
         filter_expression = ast.Filter(source_expression, self.expression(),
-                                       start=start, end=self.matched_end,
+                                       start=start, end=self.tokens.matched.end,
                                        source=self.original)
 
-        if self.accept(grammar.select_order):
+        if self.tokens.accept(grammar.select_order):
             return self.select_order(filter_expression)
 
-        if self.accept(grammar.select_limit):
+        if self.tokens.accept(grammar.select_limit):
             return self.select_limit(filter_expression)
 
         return filter_expression
 
     def select_order(self, source_expression):
-        start = self.matched_start
+        start = self.tokens.matched.start
         sort_expression = ast.Sort(source_expression, self.expression(),
-                                   start=start, end=self.matched_end,
+                                   start=start, end=self.tokens.matched.end,
                                    source=self.original)
 
-        if self.accept(grammar.select_asc):
-            sort_expression.end = self.matched_end
+        if self.tokens.accept(grammar.select_asc):
+            sort_expression.end = self.tokens.matched.end
             return sort_expression
 
-        if self.accept(grammar.select_desc):
+        if self.tokens.accept(grammar.select_desc):
             # Descending sort uses the stdlib function 'reverse' on the sorted
             # results. Standard library's core functions should ALWAYS be
             # available.
             sort_expression = ast.Apply(
                 ast.Var("reverse",
                         start=sort_expression.start,
-                        end=self.matched_end,
+                        end=self.tokens.matched.end,
                         source=self.original),
                 sort_expression,
                 start=sort_expression.start,
-                end=self.matched_end,
+                end=self.tokens.matched.end,
                 source=self.original)
 
-        if self.accept(grammar.select_limit):
+        if self.tokens.accept(grammar.select_limit):
             return self.select_limit(sort_expression)
 
-        if self.accept(grammar.select_limit):
+        if self.tokens.accept(grammar.select_limit):
             return self.select_limit(sort_expression)
 
         return sort_expression
 
     def select_limit(self, source_expression):
         """Match LIMIT take [OFFSET drop]."""
-        start = self.matched_start
+        start = self.tokens.matched.start
 
         # The expression right after LIMIT is the count to take.
         limit_count_expression = self.expression()
 
         # Optional OFFSET follows.
-        if self.accept(grammar.select_offset):
-            offset_start = self.matched_start
-            offset_end = self.matched_end
+        if self.tokens.accept(grammar.select_offset):
+            offset_start = self.tokens.matched.start
+            offset_end = self.tokens.matched.end
 
             # Next thing is the count to drop.
             offset_count_expression = self.expression()
@@ -604,7 +549,7 @@ class Parser(syntax.Syntax):
                     source=self.original),
             limit_count_expression,
             source_expression,
-            start=start, end=self.matched_end, source=self.original)
+            start=start, end=self.tokens.matched.end, source=self.original)
 
         return limit_expression
 
@@ -612,53 +557,55 @@ class Parser(syntax.Syntax):
 
     def builtin(self, keyword):
         """Parse the pseudo-function application subgrammar."""
-        keyword_start = self.matched_start
-        keyword_end = self.matched_end
-        self.expect(grammar.lparen)
+        # The match includes the lparen token, so the keyword is just the first
+        # token in the match, not the whole thing.
+        keyword_start = self.tokens.matched.first.start
+        keyword_end = self.tokens.matched.first.end
+        self.tokens.expect(common_grammar.lparen)
 
-        if self.matched_start != keyword_end:
+        if self.tokens.matched.start != keyword_end:
             return self.error(
                 "No whitespace allowed between function and lparen.",
-                start_token=self.matched_tokens[0])
+                start_token=self.tokens.matched.first)
 
         expr_type = grammar.BUILTINS[keyword.lower()]
         arguments = [self.expression()]
-        while self.accept(grammar.comma):
+        while self.tokens.accept(common_grammar.comma):
             arguments.append(self.expression())
 
-        self.expect(grammar.rparen)
+        self.tokens.expect(common_grammar.rparen)
 
         if expr_type.arity and expr_type.arity != len(arguments):
             return self.error(
                 "%s expects %d arguments, but was passed %d." % (
                     keyword, expr_type.arity, len(arguments)),
-                start_token=self.matched_tokens[0])
+                start_token=self.tokens.matched.first)
 
-        return expr_type(*arguments, start=keyword_start, end=self.matched_end,
-                         source=self.original)
+        return expr_type(*arguments, start=keyword_start,
+                         end=self.tokens.matched.end, source=self.original)
 
     # If-else if-else grammar.
     def if_if(self):
-        start = self.matched_start
+        start = self.tokens.matched.start
 
         # Even-numbered children are conditions; odd-numbered are results.
         # Last child is the else expression.
         children = [self.expression()]
 
-        self.expect(grammar.if_then)
+        self.tokens.expect(grammar.if_then)
         children.append(self.expression())
 
-        while self.accept(grammar.if_else_if):
+        while self.tokens.accept(grammar.if_else_if):
             children.append(self.expression())
-            self.expect(grammar.if_then)
+            self.tokens.expect(grammar.if_then)
             children.append(self.expression())
 
-        if self.accept(grammar.if_else):
+        if self.tokens.accept(grammar.if_else):
             children.append(self.expression())
         else:
             children.append(ast.Literal(None))
 
-        return ast.IfElse(*children, start=start, end=self.matched_end,
+        return ast.IfElse(*children, start=start, end=self.tokens.matched.end,
                           source=self.original)
 
     # Function application subgrammar.
@@ -680,37 +627,37 @@ class Parser(syntax.Syntax):
         over an arbitrary LHS expression then that syntax would be a strict
         superset of the current syntax and backwards compatible.
         """
-        start = self.matched_start
-        if self.accept(grammar.rparen):
+        start = self.tokens.matched.start
+        if self.tokens.accept(common_grammar.rparen):
             # That was easy.
-            return ast.Apply(func, start=start, end=self.matched_end,
+            return ast.Apply(func, start=start, end=self.tokens.matched.end,
                              source=self.original)
 
         arguments = [self.expression()]
-        while self.accept(grammar.comma):
+        while self.tokens.accept(common_grammar.comma):
             arguments.append(self.expression())
 
-        self.expect(grammar.rparen)
-        return ast.Apply(func, *arguments, start=start, end=self.matched_end,
-                         source=self.original)
+        self.tokens.expect(common_grammar.rparen)
+        return ast.Apply(func, *arguments, start=start,
+                         end=self.tokens.matched.end, source=self.original)
 
     # Tuple grammar.
 
     def list(self):
         """Parse a list (tuple) which can contain any combination of types."""
-        start = self.matched_start
+        start = self.tokens.matched.start
 
-        if self.accept(grammar.rbracket):
-            return ast.Tuple(start=start, end=self.matched_end,
+        if self.tokens.accept(common_grammar.rbracket):
+            return ast.Tuple(start=start, end=self.tokens.matched.end,
                              source=self.original)
 
         elements = [self.expression()]
 
-        while self.accept(grammar.comma):
+        while self.tokens.accept(common_grammar.comma):
             elements.append(self.expression())
 
-        self.expect(grammar.rbracket)
-        return ast.Tuple(*elements, start=start, end=self.matched_end,
+        self.tokens.expect(common_grammar.rbracket)
+        return ast.Tuple(*elements, start=start, end=self.tokens.matched.end,
                          source=self.original)
 
 
