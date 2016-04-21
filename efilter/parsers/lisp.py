@@ -36,6 +36,8 @@ EXPRESSIONS = {
     "isa": ast.IsInstance,
     "map": ast.Map,
     "filter": ast.Filter,
+    "reducer": ast.Reducer,
+    "group": ast.Group,
     "sort": ast.Sort,
     "any": ast.Any,
     "each": ast.Each,
@@ -82,7 +84,11 @@ class Parser(syntax.Syntax):
         if car == "var":
             return ast.Var(cdr[0])
 
-        return EXPRESSIONS[car](*(self._parse_atom(a) for a in cdr))
+        # Params are interpolated right away.
+        if car == "param":
+            return ast.Literal(self.params[cdr[0]])
+
+        return EXPRESSIONS[car](*[self._parse_atom(a) for a in cdr])
 
 
 syntax.Syntax.register_parser(Parser, shorthand="lisp")

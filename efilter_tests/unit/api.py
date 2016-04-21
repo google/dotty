@@ -63,7 +63,7 @@ class QueryTest(testlib.EfilterTestCase):
         self.assertEqual(protocol.AnyType,
                          api.infer("csv(path, decode_header:true)"))
         self.assertIsa(dict, api.infer("csv(path, decode_header:true)",
-                                       allow_io=True))
+                                       libs=("stdcore", "stdio")))
 
     def testUserFunc(self):
         with self.assertRaises(errors.EfilterKeyError):

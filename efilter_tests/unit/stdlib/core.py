@@ -87,3 +87,6 @@ class CoreTest(testlib.EfilterTestCase):
         self.assertEqual(
             core.Lower()("FOO"),
             "foo")
+
+    def testFind(self):
+        self.assertEqual(core.Find()("foobar", "bar"), 3)

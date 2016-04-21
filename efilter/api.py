@@ -30,10 +30,10 @@ from efilter.transforms import solve
 from efilter.transforms import infer_type
 
 from efilter.stdlib import core as std_core
-from efilter.stdlib import io as std_io
 
 
-def apply(query, replacements=None, vars=None, allow_io=False):
+def apply(query, replacements=None, vars=None, allow_io=False,
+          libs=("stdcore", "stdmath")):
     """Run 'query' on 'vars' and return the result(s).
 
     Arguments:
@@ -41,15 +41,27 @@ def apply(query, replacements=None, vars=None, allow_io=False):
         replacements: Built-time parameters to the query, either as dict or
             as an array (for positional interpolation).
         vars: The variables to be supplied to the query solver.
-        allow_io: If True then functions from stdlib.io will be included and
-            allowed to read from the filesystem. Use with caution!
-            (default: False)
+        allow_io: (Default: False) Include 'stdio' and allow IO functions.
+        libs: Iterable of library modules to include, given as strings.
+            Default: ('stdcore', 'stdmath')
+            For full list of bundled libraries, see efilter.stdlib.
 
-            WARNING: If the query returns a lazily-evaluated result that depends
-            on reading from a file (for example, filtering a CSV file) then the
-            file descriptor will remain open until the returned result is
-            deallocated. The caller is responsible for releasing the result when
-            it's no longer needed.
+            Note: 'stdcore' must always be included.
+
+            WARNING: Including 'stdio' must be done in conjunction with
+                'allow_io'. This is to make enabling IO explicit. 'allow_io'
+                implies that 'stdio' should be included and so adding it to
+                libs is actually not required.
+
+    Notes on IO: If allow_io is set to True then 'stdio' will be included and
+    the EFILTER query will be allowed to read files from disk. Use this with
+    caution.
+
+        If the query returns a lazily-evaluated result that depends on reading
+        from a file (for example, filtering a CSV file) then the file
+        descriptor will remain open until the returned result is deallocated.
+        The caller is responsible for releasing the result when it's no longer
+        needed.
 
     Returns:
         The result of evaluating the query. The type of the output will depend
@@ -84,9 +96,31 @@ def apply(query, replacements=None, vars=None, allow_io=False):
     if vars is None:
         vars = {}
 
-    query = q.Query(query, params=replacements)
     if allow_io:
-        vars = scope.ScopeStack(std_io.MODULE, vars)
+        libs = list(libs)
+        libs.append("stdio")
+
+    query = q.Query(query, params=replacements)
+
+    stdcore_included = False
+    for lib in libs:
+        if lib == "stdcore":
+            stdcore_included = True
+            # 'solve' always includes this automatically - we don't have a say
+            # in the matter.
+            continue
+
+        if lib == "stdio" and not allow_io:
+            raise ValueError("Attempting to include 'stdio' but IO not "
+                             "enabled. Pass allow_io=True.")
+
+        module = std_core.LibraryModule.ALL_MODULES.get(lib)
+        if not lib:
+            raise ValueError("There is no standard library module %r." % lib)
+        vars = scope.ScopeStack(module, vars)
+
+    if not stdcore_included:
+        raise ValueError("EFILTER cannot work without standard lib 'stdcore'.")
 
     results = solve.solve(query, vars).value
 
@@ -159,7 +193,8 @@ def user_func(func, arg_types=None, return_type=None):
     return UserFunction()
 
 
-def infer(query, replacements=None, root_type=None, allow_io=False):
+def infer(query, replacements=None, root_type=None,
+          libs=("stdcore", "stdmath")):
     """Determine the type of the query's output without actually running it.
 
     Arguments:
@@ -167,7 +202,8 @@ def infer(query, replacements=None, root_type=None, allow_io=False):
         replacements: Built-time parameters to the query, either as dict or as
             an array (for positional interpolation).
         root_type: The types of variables to be supplied to the query inference.
-        allow_io: Whether the inference should include IO functions.
+        libs: What standard libraries should be taken into account for the
+            inference.
 
     Returns:
         The type of the query's output, if it can be determined. If undecidable,
@@ -186,13 +222,26 @@ def infer(query, replacements=None, root_type=None, allow_io=False):
         # If root_type implements the IStructured reflection API:
         infer("SELECT * FROM people WHERE age > 10", root_type=...) # -> dict
     """
+    # Always make the scope stack start with stdcore.
     if root_type:
         type_scope = scope.ScopeStack(std_core.MODULE, root_type)
     else:
         type_scope = scope.ScopeStack(std_core.MODULE)
 
-    if allow_io:
-        type_scope = scope.ScopeStack(std_io.MODULE, type_scope)
+    stdcore_included = False
+    for lib in libs:
+        if lib == "stdcore":
+            stdcore_included = True
+            continue
+
+        module = std_core.LibraryModule.ALL_MODULES.get(lib)
+        if not module:
+            raise TypeError("No standard library module %r." % lib)
+
+        type_scope = scope.ScopeStack(module, type_scope)
+
+    if not stdcore_included:
+        raise TypeError("'stdcore' must always be included.")
 
     query = q.Query(query, params=replacements)
     return infer_type.infer_type(query, type_scope)

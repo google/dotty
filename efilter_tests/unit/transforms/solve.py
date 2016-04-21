@@ -20,10 +20,12 @@ EFILTER test suite.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+from efilter import api
 from efilter import ast
 from efilter import errors
 from efilter import query as q
 
+from efilter.protocols import reducer
 from efilter.protocols import repeated
 from efilter.protocols import superposition
 
@@ -32,6 +34,9 @@ from efilter.transforms import solve
 from efilter_tests import mocks
 from efilter_tests import testlib
 
+
+# Pylint gets confused about nested tuples in the lisp examples below.
+# pylint: disable=bad-continuation
 
 class SolveTest(testlib.EfilterTestCase):
     def testQuery(self):
@@ -255,9 +260,62 @@ class SolveTest(testlib.EfilterTestCase):
                     mocks.Process(1, None, None))}).value,
             mocks.Process(1, None, None))
 
+    def testReducer(self):
+        # This should return a reducer that computes the mean of the age
+        # property on a repeated object (tests let us use a dict as a stand-in).
+        r = api.apply(("reducer", ("var", "mean"), ("var", "age")))
+        self.assertIsInstance(r, reducer.IReducer)
+        users = repeated.meld({"name": "Mary", "age": 10},
+                              {"name": "Bob", "age": 20})
+        average = reducer.reduce(r, users)
+        self.assertEqual(average, 15)
+
+    def testGroup(self):
+        result = api.apply(
+            query=q.Query(
+                ("group",
+                    # The input:
+                    ("apply",
+                        ("var", "csv"),
+                        ("param", 0),
+                        True),
+                    # The grouper expression:
+                    ("var", "country"),
+
+                    # The output reducers:
+                    ("reducer",
+                        ("var", "singleton"),
+                        ("var", "country")),
+                    ("reducer",
+                        ("var", "mean"),
+                        ("cast",
+                            ("var", "age"),
+                            ("var", "int"))),
+                    ("reducer",
+                        ("var", "sum"),
+                        ("cast",
+                            ("var", "age"),
+                            ("var", "int")))),
+                params=[testlib.get_fixture_path("fake_users.csv")]),
+            allow_io=True)
+
+        # Round the output means for comparison.
+        actual = []
+        for row in result:
+            row[1] = int(row[1])
+            actual.append(row)
+
+        expected = repeated.meld(['El Salvador', 55, 1287],
+                                 ['Ethiopia', 55, 1210],
+                                 ['French Guiana', 47, 381],
+                                 ['Germany', 42, 299],
+                                 ['Haiti', 46, 610],
+                                 ['Mayotte', 50, 865],
+                                 ['Portugal', 48, 485])
+
+        self.assertItemsEqual(expected, actual)
+
     def testIsInstance(self):
-        # STFU, pylint, autopep says this is correct, so it's correct.
-        # pylint: disable=bad-continuation
         with self.assertRaises(
                 errors.EfilterTypeError,
                 error_f=lambda e: "Cannot find type named 'FooBar'" in str(e)):
@@ -336,6 +394,13 @@ class SolveTest(testlib.EfilterTestCase):
 
         # True negative.
         self.assertFalse(solve.solve(q.Query("'foo' in 'bar'"), {}).value)
+
+        # This should also work for strings.
+        self.assertTrue(solve.solve(q.Query("'foo' in 'foobar'"), {}).value)
+        self.assertFalse(solve.solve(q.Query("'fzz' in 'foobar'"), {}).value)
+
+        # Single characters.
+        self.assertTrue(solve.solve(q.Query("'f' in 'foo'"), {}).value)
 
     def testRegexFilter(self):
         self.assertTrue(

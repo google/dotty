@@ -41,6 +41,25 @@ class HYGDataDictPassthrough(benchmark.EfilterBenchmarkCase):
     name = "hygdata_dicts"
 
 
+class HYGDataDictGroup(benchmark.EfilterBenchmarkCase):
+    fixture_name = "hygdata_v3.csv"
+    name = "hygdata_group"
+    query = ("group",
+             ("apply",
+              ("var", "csv"),
+              ("param", 0),
+              (":", ("var", "decode_header"), True)),
+             ("var", "con"),
+             ("reducer",
+              ("var", "singleton"),
+              ("var", "con")),
+             ("reducer",
+              ("var", "mean"),
+              ("cast",
+               ("var", "dist"),
+               ("var", "float"))))
+
+
 class HYGDataFilter(benchmark.EfilterBenchmarkCase):
     fixture_name = "hygdata_v3.csv"
     # The number we're comparing 'dist' to is a string because 'dist' is a

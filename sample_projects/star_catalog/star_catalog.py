@@ -85,7 +85,7 @@ def main():
         # multiple rows.
         result_type = api.infer(query,
                                 replacements=[CATALOG_PATH],
-                                allow_io=True)  # allow_io adds the IO module.
+                                libs=("stdcore", "stdio"))
         print("# Return type will be %s." % (result_type.__name__,))
 
         # api.apply will give us the actual result of running the query, which

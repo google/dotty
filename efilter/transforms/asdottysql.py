@@ -56,7 +56,7 @@ def asdottysql(query):
     return asdottysql(query.root)
 
 
-@asdottysql.implementation(for_types=(ast.Within, ast.Cast))
+@asdottysql.implementation(for_types=(ast.Within, ast.Cast, ast.Reducer))
 def asdottysql_builtin(expr):
     if not type(expr) in BUILTINS:
         return "<Subexpression cannot be formatted as DottySQL.>"

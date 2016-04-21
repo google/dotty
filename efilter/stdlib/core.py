@@ -27,24 +27,23 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import itertools
 import six
+import threading
 
 from efilter import protocol
 
 from efilter.protocols import applicative
 from efilter.protocols import counted
+from efilter.protocols import reducer
 from efilter.protocols import repeated
 from efilter.protocols import structured
 
 
-_BUILTIN_TYPES = {
-    "int": int,
-    "str": six.text_type,
-    "bytes": six.binary_type,
-    "float": float
-}
-
-
 class TypedFunction(object):
+    """Represents an EFILTER-callable function with reflection support.
+
+    Each function in the standard library is an instance of a subclass of
+    this class. Subclasses override __call__ and the reflection API.
+    """
     name = None
 
     def apply(self, args, kwargs):
@@ -65,13 +64,109 @@ class TypedFunction(object):
 applicative.IApplicative.implicit_dynamic(TypedFunction)
 
 
+class TypedReducer(object):
+    """Represents an EFILTER-callable reducer function.
+
+    TypedReducer supports the IReducer protocol, but also works as a function
+    (IApplicative), to allow it to reduce values inside rows in a query.
+    """
+    name = None
+
+    # IApplicative
+
+    def apply(self, args, kwargs):
+        return self(*args, **kwargs)
+
+    def __call__(self, data, chunk_size=None):
+        return reducer.reduce(self, data, chunk_size)
+
+    @classmethod
+    def reflect_static_args(cls):
+        return (repeated.IRepeated,)
+
+    @classmethod
+    def reflect_static_return(cls):
+        return protocol.AnyType
+
+    # IReducer
+
+    def fold(self, chunk):
+        raise NotImplementedError()
+
+    def merge(self, left, right):
+        raise NotImplementedError()
+
+    def finalize(self, intermediate):
+        raise NotImplementedError()
+
+
+applicative.IApplicative.implicit_dynamic(TypedReducer)
+reducer.IReducer.implicit_dynamic(TypedReducer)
+
+
+class SingletonReducer(object):
+    """Preserves a literal value and ensures it's a singleton."""
+
+    name = "singleton"
+
+    def fold(self, chunk):
+        iterator = iter(chunk)
+        first = next(iterator)
+        for item in iterator:
+            if item != first:
+                raise ValueError("All values in a singleton reducer must be "
+                                 "equal to each other. Got %r != %r." % (
+                                     first, item))
+
+        return first
+
+    def merge(self, left, right):
+        if left != right:
+            raise ValueError("All values in a singleton reducer must be "
+                             "equal to each other. Got %r != %r." % (
+                                 left, right))
+
+        return left
+
+    def finalize(self, intermediate):
+        return intermediate
+
+
 class LibraryModule(object):
+    """Represents a part of the standard library.
+
+    Each library module consists of a collection of vars, which are mostly
+    instances of TypedFunction. The stdcore module also contains basic types,
+    such as 'str' or 'int', in addition to functions.
+    """
+
     vars = None
     name = None
 
-    def __init__(self, vars, name=None):
+    # This is a class-level global storing all instances by their name.
+    ALL_MODULES = {}
+    _all_modules_lock = threading.Lock()
+
+    def __init__(self, vars, name):
         self.vars = vars
         self.name = name
+
+        self._all_modules_lock.acquire()
+        try:
+            if name in self.ALL_MODULES:
+                raise ValueError("Duplicate module name %r." % name)
+
+            self.ALL_MODULES[name] = self
+        finally:
+            self._all_modules_lock.release()
+
+    def __del__(self):
+        """If modules are being used properly this will only happen on exit."""
+        self._all_modules_lock.acquire()
+        try:
+            del self.ALL_MODULES[self.name]
+        finally:
+            self._all_modules_lock.release()
 
     def __repr__(self):
         return "LibraryModule(name=%r, vars=%r)" % (self.name, self.vars)
@@ -190,17 +285,36 @@ class Lower(TypedFunction):
         return six.string_types[0]
 
 
-class Count(TypedFunction):
+class Find(TypedFunction):
+    """Returns the position of 'needle' in 'string', or -1 if not found."""
+
+    name = "find"
+
+    def __call__(self, string, needle):
+        return string.find(needle)
+
+    @classmethod
+    def reflect_static_args(cls):
+        return (six.string_types[0], six.string_types[0])
+
+    @classmethod
+    def reflect_static_return(cls):
+        return int
+
+
+class Count(TypedReducer):
     """Counts the number of elements in a tuple or of values in a repeated."""
 
     name = "count"
 
-    def __call__(self, x):
-        return counted.count(x)
+    def fold(self, chunk):
+        return counted.count(chunk)
 
-    @classmethod
-    def reflect_static_args(cls):
-        return (repeated.IRepeated,)
+    def merge(self, left, right):
+        return left + right
+
+    def finalize(self, intermediate):
+        return intermediate
 
     @classmethod
     def reflect_static_return(cls):
@@ -227,7 +341,16 @@ class Reverse(TypedFunction):
         return repeated.IRepeated
 
 
-_VARS = dict(take=Take(), drop=Drop(),
-             count=Count(), reverse=Reverse(), lower=Lower())
-_VARS.update(_BUILTIN_TYPES)
-MODULE = LibraryModule(vars=_VARS, name="stdcore")
+MODULE = LibraryModule(name="stdcore",
+                       vars={Take.name: Take(),
+                             Drop.name: Drop(),
+                             Count.name: Count(),
+                             Reverse.name: Reverse(),
+                             Lower.name: Lower(),
+                             Find.name: Find(),
+                             SingletonReducer.name: SingletonReducer(),
+                             # Built-in types below:
+                             "int": int,
+                             "str": six.text_type,
+                             "bytes": six.binary_type,
+                             "float": float})

@@ -129,6 +129,11 @@ class AsDottySQLTest(testlib.EfilterTestCase):
             original=("cast", "5", ("var", "int")),
             output="cast('5', int)")
 
+    def testReducer(self):
+        q = query.Query(("reducer", ("var", "count"), ("var", "x")))
+        self.assertEqual(asdottysql.asdottysql(q),
+                         "<Subexpression cannot be formatted as DottySQL.>")
+
     def testIsInstance(self):
         self.assertOutput(
             original="x isa t",

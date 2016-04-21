@@ -35,6 +35,9 @@ from efilter.protocols import eq
 from efilter.protocols import iset
 from efilter.protocols import number
 from efilter.protocols import ordered
+# This is not actually an unused import (see the Reducer class). Pylint is just
+# broken.
+from efilter.protocols import reducer  # pylint: disable=unused-import
 from efilter.protocols import repeated
 from efilter.protocols import structured
 
@@ -103,6 +106,7 @@ class ValueExpression(Expression):
     """Unary expression."""
     arity = 1
     __abstract = True
+    return_signature = protocol.AnyType
 
     @property
     def value(self):
@@ -141,7 +145,7 @@ class Literal(ValueExpression):
 class Var(ValueExpression):
     """Represents a member of the evaluated object - attributes of entity."""
 
-    type_signature = (associative.IAssociative,)
+    type_signature = (six.string_types[0],)
 
 
 class UnaryOperation(ValueExpression):
@@ -176,8 +180,7 @@ class Pair(BinaryExpression):
 class Select(BinaryExpression):
     """Represents a selection of the key (rhs) from the value (lhs).
 
-    This is similar to using map(value, var(...)) but allows the key to
-    be generated at runtime.
+    This usually roughly corresponds to array subscription (a[i]).
     """
 
     type_signature = (associative.IAssociative, protocol.AnyType)
@@ -263,6 +266,56 @@ class Filter(Within):
     Will return a repeated variable containing only the values for which the
     expression on the right evaluated to true.
     """
+
+
+class Reducer(BinaryExpression):
+    """(EXPERIMENTAL) Evaluates to an IReducer on the LHS with a mapper.
+
+    The LHS should return an IReducer. The RHS is a mapper expression that
+    supplies data to the reducer.
+
+    Can be used in conjunction with 'Group'. Types that implement IReducer can
+    also be applied as functions using IApplicative, but when used using the
+    IReducer protocol, typically exhibit better performance.
+    """
+
+    return_signature = reducer.IReducer
+    type_signature = (reducer.IReducer, repeated.IRepeated)
+
+    @property
+    def reducer(self):
+        return self.lhs
+
+    @property
+    def mapper(self):
+        return self.rhs
+
+
+class Group(Within):
+    """(EXPERIMENTAL) Reduces repeated values into groups by applying reducers.
+
+    This is analogous to the SQL GROUP BY statement.
+
+    The LHS must evaluate to a repeated value of rows. The grouper maps each
+    row to a group, and at least one reducer applies an IReducer instance to
+    the data. Use 'Reducer' to instantiate IReducers with mappers attached.
+    """
+
+    arity = None
+    type_signature = protocol.AnyType
+    return_signature = list
+
+    @property
+    def lhs(self):
+        return self.children[0]
+
+    @property
+    def grouper(self):
+        return self.children[1]
+
+    @property
+    def reducers(self):
+        return self.children[2:]
 
 
 class Sort(Within):

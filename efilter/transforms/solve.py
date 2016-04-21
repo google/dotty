@@ -24,6 +24,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import collections
 import re
+import six
 
 from efilter import ast
 from efilter import dispatch
@@ -37,6 +38,7 @@ from efilter.protocols import associative
 from efilter.protocols import boolean
 from efilter.protocols import number
 from efilter.protocols import ordered
+from efilter.protocols import reducer
 from efilter.protocols import repeated
 from efilter.protocols import structured
 
@@ -78,8 +80,8 @@ def solve(query, vars):
 
 @solve.implementation(for_type=q.Query)
 def solve_query(query, vars):
-    # Always include the standard library for now. We will revisit this later,
-    # and probably add something to the AST for explicit imports.
+    # Standard library must always be included. Others are optional, and the
+    # caller can add them to vars using ScopeStack.
     vars = scope.ScopeStack(std_core.MODULE, vars)
 
     try:
@@ -313,6 +315,55 @@ def solve_filter(expr, vars):
                 yield lhs_value
 
     return Result(repeated.lazy(lazy_filter), ())
+
+
+@solve.implementation(for_type=ast.Reducer)
+def solve_reducer(expr, vars):
+    def _mapper(rows):
+        mapper = expr.mapper
+        for row in rows:
+            yield solve(mapper, scope.ScopeStack(vars, row)).value
+
+    delegate = solve(expr.reducer, vars).value
+
+    return Result(reducer.Map(delegate=delegate, mapper=_mapper), ())
+
+
+@solve.implementation(for_type=ast.Group)
+def solve_group(expr, vars):
+    rows = __within_lhs_as_repeated(expr.lhs, vars)
+    reducers = [solve(child, vars).value for child in expr.reducers]
+    r = reducer.Compose(*reducers)
+    intermediates = {}
+
+    # To avoid loading too much data into memory we segment the input rows.
+    for chunk in reducer.generate_chunks(rows, reducer.DEFAULT_CHUNK_SIZE):
+        # Group rows based on the output of the grouper expression.
+        groups = {}
+        for value in chunk:
+            key = solve(expr.grouper, scope.ScopeStack(vars, value)).value
+            grouped_values = groups.setdefault(key, [])
+            grouped_values.append(value)
+
+        # Fold each group in this chunk, merge with previous intermediate, if
+        # any.
+        for key, group in six.iteritems(groups):
+            intermediate = reducer.fold(r, group)
+            previous = intermediates.get(key)
+            if previous:
+                intermediate = reducer.merge(r, intermediate, previous)
+
+            intermediates[key] = intermediate
+
+    # This could equally well return a lazy repeated value to avoid finalizing
+    # right away. The assumption here is that finalize is cheap, at least
+    # compared to fold and merge, which already have to run eagerly. Using a
+    # lazy value here would keep the intermediates around in memory, and just
+    # doesn't seem worth it.
+    results = [reducer.finalize(r, intermediate)
+               for intermediate in six.itervalues(intermediates)]
+
+    return Result(repeated.meld(*results), ())
 
 
 @solve.implementation(for_type=ast.Sort)

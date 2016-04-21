@@ -101,4 +101,6 @@ class CSV(core.TypedFunction):
         return repeated.IRepeated
 
 
-MODULE = core.LibraryModule(vars=dict(csv=CSV(), lines=Lines(), name="stdio"))
+MODULE = core.LibraryModule(name="stdio",
+                            vars={CSV.name: CSV(),
+                                  Lines.name: Lines()})

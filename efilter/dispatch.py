@@ -200,7 +200,7 @@ class multimethod(object):
             return self.func(*args, **kwargs)
         except NotImplementedError:
             # Throw a better exception.
-            if dispatch_type is type(None):
+            if isinstance(None, dispatch_type):
                 raise TypeError(
                     "%r was passed None for first argument, which was "
                     "unexpected." % self.func_name)
@@ -277,17 +277,17 @@ class multimethod(object):
         if result:
             return result
 
-        self._write_lock.acquire()
+        # The outer try ensures the lock is always released.
+        with self._write_lock:
+            try:
+                dispatch_mro = dispatch_type.mro()
+            except TypeError:
+                # Not every type has an MRO.
+                dispatch_mro = ()
 
-        try:
-            dispatch_mro = dispatch_type.mro()
-        except TypeError:
-            # Not every type has an MRO.
-            dispatch_mro = ()
+            best_match = None
+            result_type = None
 
-        best_match = None
-        result_type = None
-        try:
             for candidate_type, candidate_func in self.implementations:
                 if not issubclass(dispatch_type, candidate_type):
                     # Skip implementations that are obviously unrelated.
@@ -333,8 +333,6 @@ class multimethod(object):
 
             self._dispatch_table[dispatch_type] = result
             return result
-        finally:
-            self._write_lock.release()
 
     @staticmethod
     def __get_types(for_type=None, for_types=None):

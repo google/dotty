@@ -59,6 +59,14 @@ class ListRepetition(object):
         """
         self._delegate.extend(repeated.getvalues(value))
 
+    def add_single_value(self, value):
+        """Same as 'add_value' but even more dangerous.
+
+        Same caveats apply as with 'add_value' but also, the caller is
+        responsible for ensuring 'value' is a scalar (not another repetition).
+        """
+        self._delegate.append(value)
+
     def value_type(self):
         return self._value_type
 
