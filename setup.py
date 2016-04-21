@@ -23,7 +23,7 @@ sys.path.insert(0, ".")
 from efilter import version
 
 
-__version__ = version.get_version(False)
+__version__ = version.get_txt_version()
 
 
 class BdistRPMCommand(bdist_rpm):
@@ -97,7 +97,7 @@ class SDistCommand(sdist):
 
     def run(self):
         global __version__
-        __version__ = version.get_version(True)
+        __version__ = version.get_version(False)
         with open("version.txt", "w") as fd:
             fd.write(__version__)
 

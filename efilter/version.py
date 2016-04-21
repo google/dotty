@@ -28,6 +28,12 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 import logging
 import re
 
+RELEASE = "Awesome Sauce"
+MAJOR = 1
+MINOR = 0
+
+ANCHOR_TAG = "v%d.%d" % (MAJOR, MINOR)
+
 try:
     import datetime
     import pytz
@@ -36,66 +42,36 @@ try:
     # The below functionality is only available if dateutil is installed.
     from dateutil import parser
 
-    def _unix_epoch(date):
-        """Convert datetime object to a UTC UNIX timestamp."""
-        td = date - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
-        return int(td.total_seconds())
-
-    def git_generate_version():
-        """Generate version string from git log and revcount."""
-        date = git_last_commit_time()
-        revcount = git_commit_count()
-        if not (date and revcount):
-            return None
-
-        return "%d.%d.%d" % (date.year, date.month, revcount)
-
-    def git_last_commit_time():
-        """Return the timestamp of the latest git commit on this branch."""
+    def git_commits_since_tag(tag):
         try:
             p = subprocess.Popen(
-                ["git", "log", "-1", "--format=%cd", "--date=iso"],
+                ["git", "log", "%s..master" % tag, "--oneline"],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
             errors = p.stderr.read()
             p.stderr.close()
-            output = p.stdout.readlines()[0]
-            date = parser.parse(output)
+            commits = p.stdout.readlines()
 
-            return date
+            return commits
         except (OSError, IndexError):
-            # Even if git log fails (because it's not in a git repo), the call
-            # may still 'succeed' as far as subprocess.Popen is concerned,
-            # hence the IndexError exception. I don't know why Python sometimes
-            # ignores the return code.
             if errors:
-                logging.warn("Git log failed: %r" % errors)
+                logging.warn("git log failed with %r" % errors)
 
             return None
 
-    def git_commit_count():
-        """Return the count of commits on the current branch."""
-        try:
-            p = subprocess.Popen(
-                ["git", "rev-list", "--count", "master"],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
-            errors = p.stderr.read()
-            p.stderr.close()
-            output = p.stdout.readlines()[0]
-            revcount = int(output)
+    def git_dev_version():
+        commits = git_commits_since_tag(ANCHOR_TAG)
+        if not commits:
+            return "1!%d.%d.dev0" % (MAJOR, MINOR)
 
-            return revcount
-        except (OSError, IndexError):
-            if errors:
-                logging.warn("Git rev-list failed: %r" % errors)
+        return "1!%d.%d.dev%d" % (MAJOR, MINOR, len(commits))
 
-            return None
 
 except ImportError:
     logging.warn("pytz or dateutil are not available - getting a version "
                  "number from git won't work.")
     # If there's no dateutil then doing the git tango is pointless.
 
-    def git_generate_version():
+    def git_verbose_version():
         pass
 
 
@@ -112,7 +88,7 @@ def get_pkg_version():
         return None
 
 
-def get_version_txt():
+def get_txt_version():
     """Get version string from version.txt."""
     try:
         with open("version.txt", "r") as fp:
@@ -121,34 +97,21 @@ def get_version_txt():
         return None
 
 
-def get_version(generate_version=False):
-    """Gets the version from version.txt, PKG_INFO or git, in that order.
+def get_version(dev_version=False):
+    """Generates a version string.
 
     Arguments:
-        generate_version: Try git first.
+        dev_version: Generate a verbose development version from git commits.
 
-    Example:
-        2016.04.42
+    Examples:
+        1.1
+        1.1.43 # If 'dev_version' was passed.
     """
-    if generate_version:
-        version = git_generate_version()
-        if version:
-            return version
+    if dev_version:
+        version = git_dev_version()
+        if not version:
+            raise RuntimeError("Could not generate dev version from git.")
 
-    version = get_version_txt()
-    if version:
         return version
 
-    version = get_pkg_version()
-    if version:
-        return version
-
-    logging.warn(
-        "Couldn't get version from version.txt or PKG_INFO. Will try git.")
-
-    version = git_generate_version()
-    if version:
-        return version
-
-    raise RuntimeError(
-        "Couldn't get version from version.txt, PKG_INFO or git.")
+    return "1!%d.%d" % (MAJOR, MINOR)
