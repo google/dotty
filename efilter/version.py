@@ -17,13 +17,10 @@
 """
 EFILTER versioning scheme.
 
-EFILTER version is the UTC UNIX epoch of the git commit that the package is
-being built from. This allows us to disambiguate different builds of the same
-major version, and simply map each build back to the commit it came from.
-
-It would be more convenient to just use the git commitish as version strings,
-but PEP 0440 mandates that version numbers increment over time, which the
-commitish, being output of a hash function, doesn't.
+EFILTER version is in the following format: YEAR.MONTH.REVCOUNT, where revcount
+is the number of commits since initial commit on the master branch. This we
+believe strikes a good balance between human readable strings, and ability to
+tie a release to the git revision it was built from.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
@@ -44,12 +41,17 @@ try:
         td = date - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
         return int(td.total_seconds())
 
-    def run_git_log():
-        """Generate version based on date of last commit.
+    def git_generate_version():
+        """Generate version string from git log and revcount."""
+        date = git_last_commit_time()
+        revcount = git_commit_count()
+        if not (date and revcount):
+            return None
 
-        Returns:
-            UTC UNIX timestamp as int on success, or None.
-        """
+        return "%d.%d.%d" % (date.year, date.month, revcount)
+
+    def git_last_commit_time():
+        """Return the timestamp of the latest git commit on this branch."""
         try:
             p = subprocess.Popen(
                 ["git", "log", "-1", "--format=%cd", "--date=iso"],
@@ -58,21 +60,42 @@ try:
             p.stderr.close()
             output = p.stdout.readlines()[0]
             date = parser.parse(output)
-            return _unix_epoch(date)
+
+            return date
         except (OSError, IndexError):
             # Even if git log fails (because it's not in a git repo), the call
             # may still 'succeed' as far as subprocess.Popen is concerned,
             # hence the IndexError exception. I don't know why Python sometimes
             # ignores the return code.
             if errors:
-                logging.warn("Git logged messages to stderr: %r" % errors)
+                logging.warn("Git log failed: %r" % errors)
+
             return None
+
+    def git_commit_count():
+        """Return the count of commits on the current branch."""
+        try:
+            p = subprocess.Popen(
+                ["git", "rev-list", "--count", "master"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+            errors = p.stderr.read()
+            p.stderr.close()
+            output = p.stdout.readlines()[0]
+            revcount = int(output)
+
+            return revcount
+        except (OSError, IndexError):
+            if errors:
+                logging.warn("Git rev-list failed: %r" % errors)
+
+            return None
+
 except ImportError:
     logging.warn("pytz or dateutil are not available - getting a version "
                  "number from git won't work.")
     # If there's no dateutil then doing the git tango is pointless.
 
-    def run_git_log():
+    def git_generate_version():
         pass
 
 
@@ -89,15 +112,30 @@ def get_pkg_version():
         return None
 
 
-def get_version():
-    """Tries to get the EFILTER version from git or PKG-INFO.
+def get_version_txt():
+    """Get version string from version.txt."""
+    try:
+        with open("version.txt", "r") as fp:
+            return fp.read().strip()
+    except IOError:
+        return None
 
-    The EFILTER version is the UTC UNIX epoch of latest git commit.
+
+def get_version(generate_version=False):
+    """Gets the version from version.txt, PKG_INFO or git, in that order.
+
+    Arguments:
+        generate_version: Try git first.
 
     Example:
-        1438623992
+        2016.04.42
     """
-    version = run_git_log()
+    if generate_version:
+        version = git_generate_version()
+        if version:
+            return version
+
+    version = get_version_txt()
     if version:
         return version
 
@@ -105,4 +143,12 @@ def get_version():
     if version:
         return version
 
-    raise RuntimeError("Couldn't get git log or PKG-INFO to guess version.")
+    logging.warn(
+        "Couldn't get version from version.txt or PKG_INFO. Will try git.")
+
+    version = git_generate_version()
+    if version:
+        return version
+
+    raise RuntimeError(
+        "Couldn't get version from version.txt, PKG_INFO or git.")

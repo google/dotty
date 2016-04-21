@@ -23,7 +23,7 @@ sys.path.insert(0, ".")
 from efilter import version
 
 
-__version__ = open("version.txt").read().strip()
+__version__ = version.get_version(False)
 
 
 class BdistRPMCommand(bdist_rpm):
@@ -97,7 +97,7 @@ class SDistCommand(sdist):
 
     def run(self):
         global __version__
-        __version__ = "{0:d}".format(version.get_version())
+        __version__ = version.get_version(True)
         with open("version.txt", "w") as fd:
             fd.write(__version__)
 
@@ -105,11 +105,6 @@ class SDistCommand(sdist):
         # backwards compatibility.
         sdist.run(self)
 
-
-# Command bdist_msi does not support the library version, neither a date
-# as a version but if we suffix it with .1 everything is fine.
-if 'bdist_msi' in sys.argv:
-  __version__ += '.1'
 
 setup(name="efilter",
       version=__version__,
