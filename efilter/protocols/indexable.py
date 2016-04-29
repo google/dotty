@@ -16,7 +16,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""EFILTER abstract type system."""
+"""EFILTER abstract type system.
+
+DEPRECATION NOTICE
+
+IIndexable is no longer used by any parts of EFILTER and user software no
+longer needs to implement it for any purpose. Because some applications
+do implement IIndexable it continues to be around but will eventually be
+removed.
+
+Implementations of IIndexable can be safely removed and do not need to be
+replaced with anything.
+"""
 
 from efilter import dispatch
 from efilter import protocol
@@ -28,35 +39,10 @@ from efilter.protocols import hashable
 
 @dispatch.multimethod
 def indices(x):
-    """Return a list of keys to represent 'self' in maps.
-
-    It is sometimes desirable to store objects in sets or dicts, which are
-    not hashable. There may be two reasons for this:
-    1) Mutable objects may not be hashable for obvious reasons.
-    2) Hashable objects must satisfy:
-       x == y -> hash(x) == hash(y).
-       This requirement may be impossible to meet for certain types that
-       can compare as multiple types, for example emulated C enumerations,
-       which compare as either integers or strings, but can only be hashed
-       as one or the other.
-
-    The former is easily addressed by not using mutable types for non-ephemeral
-    state. It's the 21st century, people.
-
-    The Indexable interface addresses the latter, by letting the object return
-    a collection of keys, here called 'indices', at which it desires to appear
-    in any associative collection. The indices must themselves be hashable.
-
-    See ext.indexset for more details about how indices may be used.
-    """
+    """DEPRECATED: Return a list of keys to represent 'self' in maps."""
     raise NotImplementedError()
 
 
 class IIndexable(protocol.Protocol):
+    """DEPRECATED: if you're still using this you can safely remove."""
     _required_functions = (indices,)
-
-
-# Default implementations:
-
-IIndexable.implement(for_type=hashable.IHashable,
-                     implementations={indices: lambda x: (x,)})

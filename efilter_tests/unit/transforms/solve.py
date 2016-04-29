@@ -27,7 +27,6 @@ from efilter import query as q
 
 from efilter.protocols import reducer
 from efilter.protocols import repeated
-from efilter.protocols import superposition
 
 from efilter.transforms import solve
 
@@ -166,7 +165,7 @@ class SolveTest(testlib.EfilterTestCase):
         self.assertFalse(
             solve.solve(
                 q.Query("each(Process.parent, (pid == 1))"),
-                {"Process": {"parent": superposition.superposition(
+                {"Process": {"parent": repeated.meld(
                     mocks.Process(1, None, None),
                     mocks.Process(2, None, None))}}).value)
 
@@ -174,7 +173,7 @@ class SolveTest(testlib.EfilterTestCase):
         self.assertTrue(
             solve.solve(
                 q.Query("any Process.parent where (pid == 1)"),
-                {"Process": {"parent": superposition.superposition(
+                {"Process": {"parent": repeated.meld(
                     mocks.Process(1, None, None),
                     mocks.Process(2, None, None))}}).value)
 

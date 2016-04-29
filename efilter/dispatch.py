@@ -195,7 +195,7 @@ class multimethod(object):
         # Fall-through to calling default implementation. By convention, the
         # default will usually raise a NotImplemented exception, but there
         # may be times when it will actually do something useful (good example
-        # are convenience type checking functions, such as issuperposition).
+        # are convenience type checking functions, such as isrepeated).
         try:
             return self.func(*args, **kwargs)
         except NotImplementedError:

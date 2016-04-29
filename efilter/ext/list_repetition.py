@@ -20,7 +20,6 @@ Implements IRepeated using a list container.
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-from efilter.protocols import indexable
 from efilter.protocols import repeated
 
 
@@ -91,13 +90,6 @@ class ListRepetition(object):
     def __ne__(self, other):
         return not self == other
 
-    def indices(self):
-        result = set()
-        for value in self._delegate:
-            result |= frozenset(indexable.indices(value))
-
-        return result
-
     def value_apply(self, f):
         return repeated.repeated(*[f(x) for x in self.getvalues()])
 
@@ -106,7 +98,6 @@ class ListRepetition(object):
                            ", ".join([repr(x) for x in self.getvalues()]))
 
 
-indexable.IIndexable.implicit_static(ListRepetition)
 repeated.IRepeated.implicit_static(ListRepetition)
 repeated.repeated.implement(for_type=object,
                             implementation=ListRepetition)

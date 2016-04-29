@@ -19,8 +19,7 @@
 """EFILTER abstract type system.
 
 The repeated protocol concerns itself with variables that have more than one
-value, such as repeated fields on protocol buffers; superpositions (see
-protocols.superposition) are a special case of repeated variables.
+value, such as repeated fields on protocol buffers.
 """
 
 from efilter import dispatch
@@ -48,9 +47,7 @@ def repeated(first_value, *values):
     as the type of the other arguments.
 
     1: Order is always preserved for repetead values created with 'repeated' or
-    'meld' but not for repeated values created with other functions, such as
-    'superposition'. Order is preserved with 'getvalues' but not always with
-    'getstates' for superpositions.
+    'meld' but not for repeated values created with other functions.
     """
     raise NotImplementedError()
 

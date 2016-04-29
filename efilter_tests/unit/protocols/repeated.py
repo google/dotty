@@ -23,7 +23,6 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 import six
 import unittest
 
-from efilter.protocols import superposition
 from efilter.protocols import repeated
 
 
@@ -53,21 +52,6 @@ class RepeatedTest(unittest.TestCase):
         # Meld on two values has the same behavior as repeated.
         r = repeated.meld("foo", "foo")
         self.assertIsInstance(r, repeated.IRepeated)
-
-    def testSuperpositions(self):
-        """Superpositions can be manipulated using IRepeated."""
-        s = superposition.superposition("foo", "bar")
-        r = repeated.repeated("foo", "bar")
-
-        # Comparison should work in both directions.
-        self.assertValueEq(r, s)
-        self.assertValueEq(s, r)
-
-        # Application should preserve container type.
-        s = superposition.superposition(1, 2)
-        applied = repeated.value_apply(s, lambda x: x * 2)
-        self.assertValueEq(applied, repeated.repeated(2, 4))
-        self.assertIsInstance(applied, superposition.ISuperposition)
 
     def testTypes(self):
         """Test that types are correctly derived and enforced."""
