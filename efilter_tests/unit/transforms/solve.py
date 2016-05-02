@@ -71,6 +71,67 @@ class SolveTest(testlib.EfilterTestCase):
             solve.solve(query, {}).value,
             {"x": 5, "y": 10})
 
+    def testSubselects(self):
+        query = q.Query(
+            "5 + SELECT age FROM"
+            " (bind('age': 10, 'name': 'Tom'), bind('age': 8, 'name': 'Jerry'))"
+            " WHERE name == 'Jerry'")
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            13)
+
+        # This should fail because we're selecting two values.
+        query = q.Query(
+            "5 + SELECT age, name FROM"
+            " (bind('age': 10, 'name': 'Tom'), bind('age': 8, 'name': 'Jerry'))"
+            " WHERE name == 'Jerry'")
+        with self.assertRaises(errors.EfilterTypeError):
+            solve.solve(query, {})
+
+        # Returning multiple results from SELECT should work with set
+        # operations.
+        query = q.Query(
+            "let users = ("
+            " bind('age': 10, 'name': 'Tom'),"
+            " bind('age': 8, 'name': 'Jerry')"
+            "),"
+            "names = SELECT name FROM users"
+            " SELECT * FROM users WHERE name IN names")
+
+        self.assertValuesEqual(
+            solve.solve(query, {}).value,
+            repeated.meld({"age": 10, "name": "Tom"},
+                          {"age": 8, "name": "Jerry"}))
+
+        # However, equivalence should blow up:
+        query = q.Query(
+            "let users = ("
+            " bind('age': 10, 'name': 'Tom'),"
+            " bind('age': 8, 'name': 'Jerry')"
+            "),"
+            "names = SELECT name FROM users"
+            " SELECT * FROM users WHERE name == names")
+
+        with self.assertRaises(errors.EfilterTypeError):
+            # Need to force the results to be realized (solve is lazy), hence
+            # the list.
+            list(solve.solve(query, {}).value)
+
+        # It also shouldn't work if the subselect returns multiple columns.
+         # However, equivalence should blow up:
+        query = q.Query(
+            "let users = ("
+            " bind('age': 10, 'name': 'Tom'),"
+            " bind('age': 8, 'name': 'Jerry')"
+            "),"
+            "names = SELECT * FROM users"
+            " SELECT * FROM users WHERE name IN names")
+
+        with self.assertRaises(errors.EfilterTypeError):
+            # Need to force the results to be realized (solve is lazy), hence
+            # the list.
+            list(solve.solve(query, {}).value)
+
     def testRepeat(self):
         query = q.Query("(1, 2, 3, 4)")
         self.assertEqual(
@@ -143,6 +204,37 @@ class SolveTest(testlib.EfilterTestCase):
             solve.solve(
                 q.Query("foo.bar"), {"foo": {"bar": "baz"}}).value,
             "baz")
+
+    def testLet(self):
+        self.assertEqual(
+            solve.solve(
+                ast.Let(
+                    ast.Bind(
+                        ast.Pair(
+                            ast.Literal("x"),
+                            ast.Literal(5))),
+                    ast.Sum(
+                        ast.Var("x"),
+                        ast.Var("x"))),
+                {}).value,
+            10)
+
+        # Previous binding should be made available to subsequent bindings.
+        self.assertEqual(
+            solve.solve(
+                ast.Let(
+                    ast.Bind(
+                        ast.Pair(
+                            ast.Literal("x"),
+                            ast.Literal(5)),
+                        ast.Pair(
+                            ast.Literal("y"),
+                            ast.Sum(
+                                ast.Var("x"),
+                                ast.Literal(5)))),
+                    ast.Var("y")),
+                {}).value,
+            10)
 
     def testSelect(self):
         self.assertEqual(

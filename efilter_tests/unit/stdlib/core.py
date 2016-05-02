@@ -28,6 +28,23 @@ from efilter.stdlib import core
 
 
 class CoreTest(testlib.EfilterTestCase):
+    def testFirst(self):
+        self.assertEqual(
+            core.First()(repeated.meld(1, 2, 3, 4)),
+            1)
+
+        self.assertEqual(
+            core.First()(1),
+            1)
+
+        self.assertEqual(
+            core.First()([1, 2]),
+            [1, 2])
+
+        self.assertEqual(
+            core.First()(None),
+            None)
+
     def testTake(self):
         self.assertValuesEqual(
             core.Take()(2, repeated.meld(1, 2, 3, 4)),

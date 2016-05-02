@@ -53,6 +53,17 @@ class RepeatedTest(unittest.TestCase):
         r = repeated.meld("foo", "foo")
         self.assertIsInstance(r, repeated.IRepeated)
 
+    def testNulls(self):
+        r = None
+        for _ in repeated.getvalues(r):
+            # Should be zero elements but not raise.
+            self.assertFail()
+
+        r = repeated.meld(None, None)
+        # None should get skipped.
+        for _ in repeated.getvalues(r):
+            self.assertFail()
+
     def testTypes(self):
         """Test that types are correctly derived and enforced."""
         with self.assertRaises(TypeError):

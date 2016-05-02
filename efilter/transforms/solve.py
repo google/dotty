@@ -78,6 +78,114 @@ def solve(query, vars):
     raise NotImplementedError()
 
 
+def __solve_for_repeated(expr, vars):
+    """Helper: solve 'expr' always returning an IRepeated.
+
+    If the result of solving 'expr' is a list or a tuple of IAssociative objects
+    then treat is as a repeated value of IAssociative objects because that's
+    what the called meant to do. This is a convenience helper so users of the
+    API don't have to create IRepeated objects.
+
+    If the result of solving 'expr' is a scalar then return it as a repeated
+    value of one element.
+
+    Arguments:
+        expr: Expression to solve.
+        vars: The scope.
+
+    Returns:
+        IRepeated result of solving 'expr'.
+    """
+    var = solve(expr, vars).value
+    if (var and isinstance(var, (tuple, list))
+            and protocol.implements(var[0], associative.IAssociative)):
+        return repeated.meld(*var)
+
+    return var
+
+
+def __solve_for_scalar(expr, vars):
+    """Helper: solve 'expr' always returning a scalar (not IRepeated).
+
+    If the output of 'expr' is a single value or a single dict with a single
+    value then return that value. Otherwise raise an EfilterTypeError.
+
+    Arguments:
+        expr: Expression to solve.
+        varS: The scope.
+
+    Returns:
+        A scalar value (not an IRepeated).
+
+    Raises:
+        EfilterTypeError if it cannot get a scalar.
+    """
+    var = solve(expr, vars).value
+    try:
+        scalar = repeated.getvalue(var)
+    except TypeError:
+        raise errors.EfilterTypeError(
+            root=expr, query=expr.source,
+            message="Wasn't expecting more than one value here. Got %r."
+            % (var,))
+
+    if isinstance(scalar, associative.IAssociative):
+        keys = associative.getkeys(scalar)
+        if len(keys) == 1:
+            return associative.select(scalar, list(keys)[0])
+        else:
+            raise errors.EfilterTypeError(
+                root=expr, query=expr.source,
+                message="Was expecting a scalar value here. Got %r."
+                % (scalar,))
+    else:
+        return scalar
+
+
+def __solve_and_destructure_repeated(expr, vars):
+    """Helper: solve 'expr' always returning a list of scalars.
+
+    If the output of 'expr' is one or more dicts (IAssociative) of a single
+    element then return a repeated value of those single elements. If the dicts
+    have more than one element each then raise.
+
+    This returns a list because there's no point in wrapping the scalars in
+    a repeated value for use internal to the implementing solver.
+
+    Returns:
+        A list (not an IRepeated!) of scalars.
+
+    Raises:
+        EfilterTypeError if the values don't conform.
+    """
+    values = iter(__solve_for_repeated(expr, vars))
+
+    try:
+        first_value = next(values)
+    except StopIteration:
+        return []
+
+    if not isinstance(first_value, associative.IAssociative):
+        results = [first_value]
+        # We skip type checking the remaining values because it'd be slow.
+        results.extend(values)
+        return results
+
+    keys = associative.getkeys(first_value)
+    if len(keys) == 1:
+        key = list(keys)[0]
+    else:
+        raise errors.EfilterTypeError(
+            root=expr, query=expr.source,
+            message="Was expecting at most one key in %r." % (first_value,))
+
+    results = [associative.select(first_value, key)]
+    for value in values:
+        results.append(associative.select(value, key))
+
+    return results
+
+
 @solve.implementation(for_type=q.Query)
 def solve_query(query, vars):
     # Standard library must always be included. Others are optional, and the
@@ -110,7 +218,7 @@ def solve_var(expr, vars):
                                      query=expr.source)
     except (TypeError, ValueError) as e:
         # Raise a better exception for what is probably a null pointer error.
-        if vars is None:
+        if vars.locals is None:
             raise errors.EfilterNoneError(
                 root=expr, query=expr.source,
                 message="Trying to access member %r of a null." % expr.value)
@@ -127,8 +235,13 @@ def solve_var(expr, vars):
 
 @solve.implementation(for_type=ast.Select)
 def solve_select(expr, vars):
-    """Use IAssociative.select to get key (rhs) from the data (lhs)."""
-    data = __within_lhs_as_repeated(expr.lhs, vars)
+    """Use IAssociative.select to get key (rhs) from the data (lhs).
+
+    This operation supports both scalars and repeated values on the LHS -
+    selecting from a repeated value implies a map-like operation and returns a
+    new repeated value.
+    """
+    data = __solve_for_repeated(expr.lhs, vars)
     key = solve(expr.rhs, vars).value
 
     try:
@@ -138,7 +251,7 @@ def solve_select(expr, vars):
         raise errors.EfilterKeyError(root=expr, key=key, query=expr.source)
     except (TypeError, ValueError):
         # Raise a better exception for what is probably a null pointer error.
-        if vars is None:
+        if vars.locals is None:
             raise errors.EfilterNoneError(
                 root=expr, query=expr.source,
                 message="Cannot select key %r from a null." % key)
@@ -154,8 +267,13 @@ def solve_select(expr, vars):
 
 @solve.implementation(for_type=ast.Resolve)
 def solve_resolve(expr, vars):
-    """Use IStructured.resolve to get member (rhs) from the object (lhs)."""
-    objs = __within_lhs_as_repeated(expr.lhs, vars)
+    """Use IStructured.resolve to get member (rhs) from the object (lhs).
+
+    This operation supports both scalars and repeated values on the LHS -
+    resolving from a repeated value implies a map-like operation and returns a
+    new repeated values.
+    """
+    objs = __solve_for_repeated(expr.lhs, vars)
     member = solve(expr.rhs, vars).value
 
     try:
@@ -167,7 +285,7 @@ def solve_resolve(expr, vars):
                                      query=expr.source)
     except (TypeError, ValueError):
         # Is this a null object error?
-        if vars is None:
+        if vars.locals is None:
             raise errors.EfilterNoneError(
                 root=expr, query=expr.source,
                 message="Cannot resolve member %r from a null." % member)
@@ -190,7 +308,7 @@ def solve_apply(expr, vars):
     a whitelist. EFILTER will never directly call a function that wasn't
     provided through a protocol implementation.
     """
-    func = solve(expr.func, vars).value
+    func = __solve_for_scalar(expr.func, vars)
     args = []
     kwargs = {}
     for arg in expr.args:
@@ -211,16 +329,38 @@ def solve_apply(expr, vars):
 
 @solve.implementation(for_type=ast.Bind)
 def solve_bind(expr, vars):
-    """Build a dict from key/value pairs under the bind."""
+    """Build a dict from key/value pairs under the bind.
+
+    The Bind subtree is arranged as follows:
+
+    Bind
+    | First KV Pair
+    | | First Key Expression
+    | | First Value Expression
+    | Second KV Pair
+    | | Second Key Expression
+    | | Second Value Expression
+    Etc...
+
+    As we evaluate the subtree, each subsequent KV pair is evaluated with
+    the all previous bingings already in scope. For example:
+
+    bind(x: 5, y: x + 5)  # Will bind y = 10 because x is already available.
+    """
     result = {}
+    intermediate_scope = scope.ScopeStack(vars, result)
+
     for pair in expr.children:
         if not isinstance(pair, ast.Pair):
             raise errors.EfilterError(
                 root=pair, query=expr.source,
                 message="Bind expression must consist of key/value pairs.")
 
-        key = solve(pair.key, vars).value
-        value = solve(pair.value, vars).value
+        key = solve(pair.key, intermediate_scope).value
+        value = solve(pair.value, intermediate_scope).value
+
+        # Update the intermediate bindings so as to make earlier bindings
+        # already available to the next child-expression.
         result[key] = value
 
     return Result(result, ())
@@ -255,22 +395,6 @@ def solve_ifelse(expr, vars):
     return solve(expr.default(), vars)
 
 
-def __within_lhs_as_repeated(lhs_expr, vars):
-    """Map/Filter/others support lists and IRepeated on the LHS.
-
-    If the value of 'lhs_expr' is a list or tuple of IAssociative objects then
-    treat it as an IRepeated of IAssociative objects because that is what the
-    caller meant to do. This is a convenience so that users don't have to
-    create IRepeated objects.
-    """
-    var = solve(lhs_expr, vars).value
-    if (var and isinstance(var, (tuple, list))
-            and protocol.implements(var[0], associative.IAssociative)):
-        return repeated.meld(*var)
-
-    return var
-
-
 @solve.implementation(for_type=ast.Map)
 def solve_map(expr, vars):
     """Solves the map-form, by recursively calling its RHS with new vars.
@@ -286,7 +410,7 @@ def solve_map(expr, vars):
     evaluate to {"name": "Bob"}, which subdict will then be used on the RHS as
     new vars, and that whole form will evaluate to "Bob".
     """
-    lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
+    lhs_values = __solve_for_repeated(expr.lhs, vars)
 
     def lazy_map():
         try:
@@ -300,13 +424,26 @@ def solve_map(expr, vars):
     return Result(repeated.lazy(lazy_map), ())
 
 
+@solve.implementation(for_type=ast.Let)
+def solve_let(expr, vars):
+    """Solves a let-form by calling RHS with nested scope."""
+    lhs_value = solve(expr.lhs, vars).value
+    if not isinstance(lhs_value, structured.IStructured):
+        raise errors.EfilterTypeError(
+            root=expr.lhs, query=expr.original,
+            message="The LHS of 'let' must evaluate to an IStructured. Got %r."
+            % (lhs_value,))
+
+    return solve(expr.rhs, scope.ScopeStack(vars, lhs_value))
+
+
 @solve.implementation(for_type=ast.Filter)
 def solve_filter(expr, vars):
     """Filter values on the LHS by evaluating RHS with each value.
 
     Returns any LHS values for which RHS evaluates to a true value.
     """
-    lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
+    lhs_values = __solve_for_repeated(expr.lhs, vars)
 
     def lazy_filter():
         for lhs_value in repeated.getvalues(lhs_values):
@@ -331,7 +468,7 @@ def solve_reducer(expr, vars):
 
 @solve.implementation(for_type=ast.Group)
 def solve_group(expr, vars):
-    rows = __within_lhs_as_repeated(expr.lhs, vars)
+    rows = __solve_for_repeated(expr.lhs, vars)
     reducers = [solve(child, vars).value for child in expr.reducers]
     r = reducer.Compose(*reducers)
     intermediates = {}
@@ -369,7 +506,7 @@ def solve_group(expr, vars):
 @solve.implementation(for_type=ast.Sort)
 def solve_sort(expr, vars):
     """Sort values on the LHS by the value they yield when passed to RHS."""
-    lhs_values = repeated.getvalues(__within_lhs_as_repeated(expr.lhs, vars))
+    lhs_values = repeated.getvalues(__solve_for_repeated(expr.lhs, vars))
 
     sort_expression = expr.rhs
 
@@ -391,7 +528,7 @@ def solve_each(expr, vars):
     IAssociative objects then RHS will be evaluated with each state and True
     will be returned only if each result is true.
     """
-    lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
+    lhs_values = __solve_for_repeated(expr.lhs, vars)
 
     for lhs_value in repeated.getvalues(lhs_values):
         result = solve(expr.rhs, scope.ScopeStack(vars, lhs_value))
@@ -405,7 +542,7 @@ def solve_each(expr, vars):
 @solve.implementation(for_type=ast.Any)
 def solve_any(expr, vars):
     """Same as Each, except returning True on first true result at LHS."""
-    lhs_values = __within_lhs_as_repeated(expr.lhs, vars)
+    lhs_values = __solve_for_repeated(expr.lhs, vars)
 
     try:
         rhs = expr.rhs
@@ -517,7 +654,7 @@ def solve_sum(expr, vars):
     total = 0
 
     for child in expr.children:
-        val = solve(child, vars).value
+        val = __solve_for_scalar(child, vars)
         try:
             total += val
         except TypeError:
@@ -532,10 +669,10 @@ def solve_sum(expr, vars):
 def solve_difference(expr, vars):
     children = enumerate(expr.children)
     _, first_child = next(children)
-    difference = solve(first_child, vars).value
+    difference = __solve_for_scalar(first_child, vars)
 
     for idx, child in children:
-        val = solve(child, vars).value
+        val = __solve_for_scalar(child, vars)
         try:
             difference -= val
         except TypeError:
@@ -558,7 +695,7 @@ def solve_product(expr, vars):
     product = 1
 
     for child in expr.children:
-        val = solve(child, vars).value
+        val = __solve_for_scalar(child, vars)
         try:
             product *= val
         except TypeError:
@@ -574,10 +711,10 @@ def solve_product(expr, vars):
 def solve_quotient(expr, vars):
     children = enumerate(expr.children)
     _, first_child = next(children)
-    quotient = solve(first_child, vars).value
+    quotient = __solve_for_scalar(first_child, vars)
 
     for idx, child in children:
-        val = solve(child, vars).value
+        val = __solve_for_scalar(child, vars)
         try:
             quotient /= val
         except TypeError:
@@ -597,9 +734,10 @@ def solve_quotient(expr, vars):
 @solve.implementation(for_type=ast.Equivalence)
 def solve_equivalence(expr, vars):
     children = iter(expr.children)
-    first_value = solve(next(children), vars).value
+    first_value = __solve_for_scalar(next(children), vars)
     for child in children:
-        if not repeated.value_eq(solve(child, vars).value, first_value):
+        value = __solve_for_scalar(child, vars)
+        if not value == first_value:
             return Result(False, ())
 
     return Result(True, ())
@@ -607,19 +745,26 @@ def solve_equivalence(expr, vars):
 
 @solve.implementation(for_type=ast.Membership)
 def solve_membership(expr, vars):
-    element = solve(expr.element, vars).value
-    values = solve(expr.set, vars).value
+    needle = solve(expr.element, vars).value
 
-    if isinstance(values, repeated.IRepeated):
-        return Result(element in repeated.getvalues(values), ())
+    # There is an expectation that "foo" in "foobar" will be true, while at
+    # the same time that "foo" in ["foobar", "fuzz"] will be false. The
+    # expectation probably comes down to the fact that this is how the 'in'
+    # operator behaves in other languages, such as Python. To meet the
+    # expectation, we treat as special the case where the RHS is a literal
+    # string value.
+    if (isinstance(expr.set, ast.Literal)
+            and isinstance(expr.set.value, six.string_types)):
+        return Result(needle in expr.set.value, ())
 
-    return Result(element in values, ())
+    values = __solve_and_destructure_repeated(expr.set, vars)
+    return Result(needle in values, ())
 
 
 @solve.implementation(for_type=ast.RegexFilter)
 def solve_regexfilter(expr, vars):
-    string = solve(expr.string, vars).value
-    pattern = solve(expr.regex, vars).value
+    string = __solve_for_scalar(expr.string, vars)
+    pattern = __solve_for_scalar(expr.regex, vars)
 
     return Result(re.compile(pattern).match(str(string)), ())
 
@@ -627,13 +772,13 @@ def solve_regexfilter(expr, vars):
 @solve.implementation(for_type=ast.StrictOrderedSet)
 def solve_strictorderedset(expr, vars):
     iterator = iter(expr.children)
-    min_ = solve(next(iterator), vars).value
+    min_ = __solve_for_scalar(next(iterator), vars)
 
     if min_ is None:
         return Result(False, ())
 
     for child in iterator:
-        val = solve(child, vars).value
+        val = __solve_for_scalar(child, vars)
 
         try:
             if not min_ > val or val is None:
@@ -652,13 +797,13 @@ def solve_strictorderedset(expr, vars):
 @solve.implementation(for_type=ast.PartialOrderedSet)
 def solve_partialorderedset(expr, vars):
     iterator = iter(expr.children)
-    min_ = solve(next(iterator), vars).value
+    min_ = __solve_for_scalar(next(iterator), vars)
 
     if min_ is None:
         return Result(False, ())
 
     for child in iterator:
-        val = solve(child, vars).value
+        val = __solve_for_scalar(child, vars)
 
         try:
             if min_ < val or val is None:

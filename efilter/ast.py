@@ -260,6 +260,10 @@ class Map(Within):
     """
 
 
+class Let(Within):
+    """Works like Map, but over a single value on the LHS."""
+
+
 class Filter(Within):
     """Filters (repeated) values on left side using expression on right side.
 

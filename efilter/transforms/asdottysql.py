@@ -77,6 +77,20 @@ def asdottysql_map(expr):
     return "map(%s, %s)" % (lhs, rhs)
 
 
+@asdottysql.implementation(for_type=ast.Let)
+def asdottysql_let(expr):
+    if not isinstance(expr.lhs, ast.Bind):
+        return "<Non-literal let cannot be formatted as DottySQL>"
+
+    pairs = []
+    for pair in expr.lhs.children:
+        if not isinstance(pair.lhs, ast.Literal):
+            return "<Non-literal binding names cannot be formatted as DottySQL>"
+        pairs.append("%s = %s" % (pair.lhs.value, asdottysql(pair.rhs)))
+
+    return "let(%s) %s" % (", ".join(pairs), asdottysql(expr.rhs))
+
+
 @asdottysql.implementation(for_types=(ast.NumericExpression, ast.Relation,
                                       ast.LogicalOperation))
 def asdottysql_operator(expr):

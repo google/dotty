@@ -99,6 +99,45 @@ class ParserTest(testlib.EfilterTestCase):
                     ast.Literal(2))),
             params=dict(bar="foo", foo=1))
 
+    def testLet(self):
+        self.assertQueryMatches(
+            "let x = 5, y = 10 x + y",
+            ast.Let(
+                ast.Bind(
+                    ast.Pair(
+                        ast.Literal("x"),
+                        ast.Literal(5)),
+                    ast.Pair(
+                        ast.Literal("y"),
+                        ast.Literal(10))),
+                ast.Sum(
+                    ast.Var("x"),
+                    ast.Var("y"))))
+
+        self.assertQueryMatches(
+            "let( (x = 5 - 3,y=(10+(10)) ) )x + y",
+            ast.Let(
+                ast.Bind(
+                    ast.Pair(
+                        ast.Literal("x"),
+                        ast.Difference(
+                            ast.Literal(5),
+                            ast.Literal(3))),
+                    ast.Pair(
+                        ast.Literal("y"),
+                        ast.Sum(
+                            ast.Literal(10),
+                            ast.Literal(10)))),
+                ast.Sum(
+                    ast.Var("x"),
+                    ast.Var("y"))))
+
+        self.assertQueryRaises("let x = 5) x + 5")
+        self.assertQueryRaises("let ((x = 5) x + 5")
+        self.assertQueryRaises("let (x = 5)) x + 5")
+        self.assertQueryRaises("let (x = 5 x + 5")
+        self.assertQueryRaises("let (x = 5)")
+
     def testLiterals(self):
         # Numbers:
         self.assertQueryMatches("5", ast.Literal(5))

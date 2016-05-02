@@ -55,6 +55,23 @@ class LazyRepetitionTest(testlib.EfilterTestCase):
         self.assertItemsEqual(l.value_apply(lambda x: x * 2).getvalues(),
                               [2, 4])
 
+    def testProtocol(self):
+        def _generator():
+            yield "a"
+
+        single = lazy_repetition.LazyRepetition(_generator)
+        self.assertEqual(list(repeated.getvalues(single)), ["a"])
+        self.assertEqual(repeated.getvalue(single), "a")
+
+        def _generator():
+            yield "a"
+            yield "b"
+
+        double = lazy_repetition.LazyRepetition(_generator)
+        self.assertEqual(list(repeated.getvalues(double)), ["a", "b"])
+        with self.assertRaises(TypeError):
+            repeated.getvalue(double)
+
     def testScalarCompare(self):
         def _generator():
             yield 1

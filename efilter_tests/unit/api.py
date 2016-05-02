@@ -27,7 +27,7 @@ from efilter import errors
 from efilter import protocol
 
 
-class QueryTest(testlib.EfilterTestCase):
+class APITest(testlib.EfilterTestCase):
     def testApply(self):
         self.assertValuesEqual(
             api.apply("select age from data where name == 'Peter'",
@@ -47,6 +47,15 @@ class QueryTest(testlib.EfilterTestCase):
                                       dict(name="Paul", age=30)]),
                       replacements=["Peter"]),
             dict(age=20, name="Peter"))
+
+    def testLet(self):
+        self.assertEqual(
+            api.apply("let(x = 5, y = 10 * 2) x + y"),
+            25)
+
+        self.assertEqual(
+            api.apply("let(x = 5, y = 10 * x, z = (x + y)) z - y"),
+            5)
 
     def testSearch(self):
         self.assertSequenceEqual(

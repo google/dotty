@@ -66,7 +66,9 @@ class EfilterTestCase(unittest.TestCase):
         self.assertTrue(protocol.isa(t, p), "%r is not type %r." % (t, p))
 
     def assertItemsEqual(self, x, y):
-        self.assertEqual(sorted(x), sorted(y))
+        """Sorted comparison in a way that prevents Python 3 from bitching."""
+        # This is a massive hack but works for tests.
+        self.assertEqual(sorted(x, key=repr), sorted(y, key=repr))
 
     def assertValuesEqual(self, x, y):
         self.assertItemsEqual(repeated.getvalues(x), repeated.getvalues(y))

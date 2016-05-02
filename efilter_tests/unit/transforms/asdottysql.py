@@ -64,6 +64,11 @@ class AsDottySQLTest(testlib.EfilterTestCase):
             original=(".", (".", ("var", "x"), "y"), "z"),
             output="x.y.z")
 
+    def testLet(self):
+        self.assertOutput(
+            original="let(x = 5, y = 10) x * y",
+            output="let(x = 5, y = 10) x * y")
+
     def testNumericExpression(self):
         self.assertOutput(
             original="x + y * 10 + z",

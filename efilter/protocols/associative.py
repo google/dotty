@@ -89,8 +89,9 @@ IAssociative.implement(for_type=dict,
                            select: lambda d, key: d[key],
                            getkeys_runtime: lambda d: d.keys()})
 
-IAssociative.implement(for_type=counted.ICounted,
-                       implementations={
-                           select: lambda c, idx: c[idx],
-                           getkeys_runtime:
-                               lambda c: six.moves.range(counted.count(c))})
+
+IAssociative.implement(
+    for_types=(list, tuple),
+    implementations={
+        select: lambda c, idx: c[idx],
+        getkeys_runtime: lambda c: six.moves.range(counted.count(c))})

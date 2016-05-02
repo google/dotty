@@ -190,6 +190,16 @@ def builtin(tokens):
     return common.keywords(tokens, BUILTINS)
 
 
+def let(tokens):
+    """Matches a let expression."""
+    return common.keyword(tokens, "let")
+
+
+def let_assign(tokens):
+    """Matches a '=' in the let expression."""
+    return common.keyword(tokens, "=")
+
+
 def application(tokens):
     """Matches function call (application)."""
     tokens = iter(tokens)

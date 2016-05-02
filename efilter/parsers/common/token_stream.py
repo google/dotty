@@ -109,9 +109,18 @@ class TokenStream(object):
         except AttributeError:
             func_name = "<unnamed grammar function>"
 
+        start, end = self.current_position()
         raise errors.EfilterParseError(
-            query=self.tokenizer.source, token=self.peek(0),
+            query=self.tokenizer.source, start=start, end=end,
             message="Was expecting %s here." % (func_name))
+
+    def current_position(self):
+        """Return a tuple of (start, end)."""
+        token = self.tokenizer.peek(0)
+        if token:
+            return token.start, token.end
+
+        return self.tokenizer.position, self.tokenizer.position + 1
 
     def peek(self, n):
         """Same as self.tokenizer.peek."""

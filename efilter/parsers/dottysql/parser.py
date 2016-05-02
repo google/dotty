@@ -34,12 +34,15 @@ atom =
     ( select_expression
     | any_expression
     | func_application
+    | let_expr
     | var
     | literal
     | list
     | "(" expression ["," expression ] ")" ).
 
 list = "[" literal [ { "," literal } ] "]" .
+
+let_expr = "let" var "=" expression [ "," var "=" expression ] expression .
 
 select_expression = "select" ("*" | "any" | what_expression ) from_expression .
 what_expression = expression ["as" var ] { "," expression ["as" var ] } .
@@ -159,6 +162,7 @@ class Parser(syntax.Syntax):
                 ( select_expression
                 | any_expression
                 | func_application
+                | let_expr
                 | var
                 | literal
                 | list
@@ -167,6 +171,10 @@ class Parser(syntax.Syntax):
         # Parameter replacement with literals.
         if self.tokens.accept(grammar.param):
             return self.param()
+
+        # Let expressions (let(x = 5, y = 10) x + y)
+        if self.tokens.accept(grammar.let):
+            return self.let()
 
         # At the top level, we try to see if we are recursing into an SQL query.
         if self.tokens.accept(grammar.select):
@@ -249,6 +257,39 @@ class Parser(syntax.Syntax):
                 start_token=self.tokens.peek(0))
         else:
             return self.error("Unexpected end of input.")
+
+    def let(self):
+        saved_start = self.tokens.matched.start
+
+        expect_rparens = 0
+        while self.tokens.accept(common_grammar.lparen):
+            expect_rparens += 1
+
+        bindings = []
+        while True:
+            symbol = self.tokens.expect(common_grammar.symbol)
+            binding = ast.Literal(symbol.value, start=symbol.start,
+                                  end=symbol.end, source=self.original)
+
+            self.tokens.expect(grammar.let_assign)
+
+            value = self.expression()
+            bindings.append(ast.Pair(binding, value, start=binding.start,
+                                     end=value.end, source=self.original))
+
+            if not self.tokens.accept(common_grammar.comma):
+                break
+
+        bind = ast.Bind(*bindings, start=bindings[0].start,
+                        end=bindings[-1].end, source=self.original)
+
+        while expect_rparens:
+            self.tokens.expect(common_grammar.rparen)
+            expect_rparens -= 1
+
+        nested_expression = self.expression()
+        return ast.Let(bind, nested_expression, start=saved_start,
+                       end=nested_expression.end, source=self.original)
 
     def param(self):
         if self.tokens.matched.value is None:

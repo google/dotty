@@ -184,8 +184,26 @@ class LibraryModule(object):
 structured.IStructured.implicit_static(LibraryModule)
 
 
+class First(TypedFunction):
+    """Return the first value from an IRepeated."""
+
+    name = "first"
+
+    def __call__(self, x):
+        for value in repeated.getvalues(x):
+            return value
+
+    @classmethod
+    def reflect_static_args(cls):
+        return (repeated.IRepeated,)
+
+    @classmethod
+    def reflect_static_return(cls):
+        return protocol.AnyType
+
+
 class Take(TypedFunction):
-    """Takes only the first 'count' elements from 'x' (tuple or IRepeated).
+    """Take only the first 'count' elements from 'x' (tuple or IRepeated).
 
     This implementation is lazy.
 
@@ -227,7 +245,7 @@ class Take(TypedFunction):
 
 
 class Drop(TypedFunction):
-    """Drops the first 'count' elements from 'x' (tuple or IRepeated).
+    """Drop the first 'count' elements from 'x' (tuple or IRepeated).
 
     This implementation is lazy.
 
@@ -269,7 +287,7 @@ class Drop(TypedFunction):
 
 
 class Lower(TypedFunction):
-    """Makes a string lowercase."""
+    """Make a string lowercase."""
 
     name = "lower"
 
@@ -322,7 +340,7 @@ class Count(TypedReducer):
 
 
 class Reverse(TypedFunction):
-    """Reverses a tuple of a repeated and maintains the type."""
+    """Reverse a tuple of a repeated and maintains the type."""
 
     name = "reverse"
 
@@ -349,6 +367,7 @@ MODULE = LibraryModule(name="stdcore",
                              Lower.name: Lower(),
                              Find.name: Find(),
                              SingletonReducer.name: SingletonReducer(),
+                             First.name: First(),
                              # Built-in types below:
                              "int": int,
                              "str": six.text_type,

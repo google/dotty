@@ -149,11 +149,12 @@ def value_apply(x, f):
 @dispatch.multimethod
 def isrepeating(x):
     """Optional: Is x a repeated var AND does it have more than one value?"""
-    return isinstance(x, IRepeated) and len(getvalues(x)) > 1
+    return isinstance(x, IRepeated) and counted.count(x) > 1
 
 
 class IRepeated(protocol.Protocol):
     _required_functions = (getvalues, value_type, value_eq, value_apply)
+    _optional_functions = (isrepeating,)
 
 
 def _scalar_value_eq(x, y):

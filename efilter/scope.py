@@ -64,7 +64,7 @@ class ScopeStack(object):
                 flattened_scopes.append(scope)
             else:
                 raise TypeError("Scopes must be instances or subclasses of "
-                                "IStructured; got %r." % scope)
+                                "IStructured; got %r." % (scope,))
 
         self.scopes = flattened_scopes
 
