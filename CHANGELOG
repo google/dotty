@@ -1,0 +1,13 @@
+2016-04-21 EFILTER 1.0 (Awesome Sauce)
+
+Initial stable release.
+
+2016-05-04 EFILTER 1.1 (Awesome Sauce)
+
+ - fce5e4cf284df4868af21db07d1929a2cbd3639e
+    - Removed ISuperposition and deprecated IIndexable.
+ - fce5e4cf284df4868af21db07d1929a2cbd3639e
+    - Added the let keyword.
+    - Bind now supports an intermediate scope.
+    - Added a 'first' function.
+    - solver now treats IRepeated of one as scalar (allowing for nice subselects).

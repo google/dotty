@@ -30,7 +30,7 @@ import re
 
 RELEASE = "Awesome Sauce"
 MAJOR = 1
-MINOR = 0
+MINOR = 1
 
 ANCHOR_TAG = "v%d.%d" % (MAJOR, MINOR)
 
