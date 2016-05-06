@@ -30,7 +30,7 @@ import re
 
 RELEASE = "Awesome Sauce"
 MAJOR = 1
-MINOR = 1
+MINOR = 2
 
 ANCHOR_TAG = "v%d.%d" % (MAJOR, MINOR)
 
@@ -105,7 +105,7 @@ def get_version(dev_version=False):
 
     Examples:
         1.1
-        1.1.43 # If 'dev_version' was passed.
+        1.1.dev43 # If 'dev_version' was passed.
     """
     if dev_version:
         version = git_dev_version()

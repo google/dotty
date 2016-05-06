@@ -1,6 +1,7 @@
-2016-04-21 EFILTER 1.0 (Awesome Sauce)
+2016-05-06 EFILTER 1.2 (Awesome Sauce)
 
-Initial stable release.
+ - e613de6f00bcb33f2644662d9167ccb656ff8c8f
+    - Display nicer error messages in some cases.
 
 2016-05-04 EFILTER 1.1 (Awesome Sauce)
 
@@ -11,3 +12,7 @@ Initial stable release.
     - Bind now supports an intermediate scope.
     - Added a 'first' function.
     - solver now treats IRepeated of one as scalar (allowing for nice subselects).
+
+2016-04-21 EFILTER 1.0 (Awesome Sauce)
+
+Initial stable release.
