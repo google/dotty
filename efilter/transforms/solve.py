@@ -186,6 +186,20 @@ def __solve_and_destructure_repeated(expr, vars):
     return results
 
 
+def __nest_scope(expr, outer, inner):
+    try:
+        return scope.ScopeStack(outer, inner)
+    except TypeError:
+        if protocol.implements(inner, applicative.IApplicative):
+            raise errors.EfilterTypeError(
+                root=expr, query=expr.source,
+                message="Attempting to use a function %r as an object." % inner)
+
+        raise errors.EfilterTypeError(
+            root=expr, query=expr.source,
+            message="Attempting to use %r as an object (IStructured)." % inner)
+
+
 @solve.implementation(for_type=q.Query)
 def solve_query(query, vars):
     # Standard library must always be included. Others are optional, and the
@@ -415,8 +429,8 @@ def solve_map(expr, vars):
     def lazy_map():
         try:
             for lhs_value in repeated.getvalues(lhs_values):
-                nested_scope = scope.ScopeStack(vars, lhs_value)
-                yield solve(expr.rhs, nested_scope).value
+                yield solve(expr.rhs,
+                            __nest_scope(expr.lhs, vars, lhs_value)).value
         except errors.EfilterNoneError as error:
             error.root = expr
             raise
@@ -434,7 +448,7 @@ def solve_let(expr, vars):
             message="The LHS of 'let' must evaluate to an IStructured. Got %r."
             % (lhs_value,))
 
-    return solve(expr.rhs, scope.ScopeStack(vars, lhs_value))
+    return solve(expr.rhs, __nest_scope(expr.lhs, vars, lhs_value))
 
 
 @solve.implementation(for_type=ast.Filter)
@@ -447,8 +461,7 @@ def solve_filter(expr, vars):
 
     def lazy_filter():
         for lhs_value in repeated.getvalues(lhs_values):
-            nested_scope = scope.ScopeStack(vars, lhs_value)
-            if solve(expr.rhs, nested_scope).value:
+            if solve(expr.rhs, __nest_scope(expr.lhs, vars, lhs_value)).value:
                 yield lhs_value
 
     return Result(repeated.lazy(lazy_filter), ())
@@ -459,7 +472,7 @@ def solve_reducer(expr, vars):
     def _mapper(rows):
         mapper = expr.mapper
         for row in rows:
-            yield solve(mapper, scope.ScopeStack(vars, row)).value
+            yield solve(mapper, __nest_scope(expr.lhs, vars, row)).value
 
     delegate = solve(expr.reducer, vars).value
 
@@ -478,7 +491,7 @@ def solve_group(expr, vars):
         # Group rows based on the output of the grouper expression.
         groups = {}
         for value in chunk:
-            key = solve(expr.grouper, scope.ScopeStack(vars, value)).value
+            key = solve(expr.grouper, __nest_scope(expr.lhs, vars, value)).value
             grouped_values = groups.setdefault(key, [])
             grouped_values.append(value)
 
@@ -511,7 +524,7 @@ def solve_sort(expr, vars):
     sort_expression = expr.rhs
 
     def _key_func(x):
-        return solve(sort_expression, scope.ScopeStack(vars, x)).value
+        return solve(sort_expression, __nest_scope(expr.lhs, vars, x)).value
 
     results = ordered.ordered(lhs_values, key_func=_key_func)
 
@@ -531,7 +544,7 @@ def solve_each(expr, vars):
     lhs_values = __solve_for_repeated(expr.lhs, vars)
 
     for lhs_value in repeated.getvalues(lhs_values):
-        result = solve(expr.rhs, scope.ScopeStack(vars, lhs_value))
+        result = solve(expr.rhs, __nest_scope(expr.lhs, vars, lhs_value))
         if not result.value:
             # Each is required to return an actual boolean.
             return result._replace(value=False)
@@ -553,7 +566,7 @@ def solve_any(expr, vars):
 
     result = Result(False, ())
     for lhs_value in repeated.getvalues(lhs_values):
-        result = solve(rhs, scope.ScopeStack(vars, lhs_value))
+        result = solve(rhs, __nest_scope(expr.lhs, vars, lhs_value))
         if result.value:
             # Any is required to return an actual boolean.
             return result._replace(value=True)
