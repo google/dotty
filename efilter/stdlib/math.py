@@ -20,10 +20,81 @@
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
+import six
+from six.moves import xrange
 
 from efilter.protocols import counted
 from efilter.protocols import number
 from efilter.stdlib import core
+
+
+# Analytical functions:
+
+
+class LevenshteinDistance(core.TypedFunction):
+    """Compute Levenshtein distance between 'x' and 'y'.
+
+    Levenshtein distance is, informally, the number of insert/delete/substitute
+    operations needed to transform 'x' to 'y'. Computing the distance takes
+    O(N * M) steps using the bottom-up dynamic programming approach below.
+
+    See: https://en.wikipedia.org/wiki/Levenshtein_distance.
+    """
+
+    name = "levenshtein"
+
+    def __call__(self, x, y):
+        lx = len(x)
+        ly = len(y)
+
+        # Base cases:
+        if not lx:
+            return ly
+
+        if not ly:
+            return lx
+
+        if lx > ly:
+            # This saves space, because the rows are shorter.
+            return self(y, x)
+
+        # Conceptually, this is a matrix of edit distances between prefixes of
+        # x and y, arranged so that every coordinate pair into the matrix is
+        # the levenshtein distance between the first 'i' characters of 'x' and
+        # first 'j' characters of 'y'. To compute the distance from x to y we
+        # need all intermediate results, but only the last two rows at a time.
+
+        # The first row of edit distances: an empty string can be transformed
+        # into a string of length N in N steps.
+        current_row = list(xrange(lx))
+
+        for i in xrange(1, ly):
+            previous_row = current_row
+            current_row = [0] * lx
+            current_row[0] = i
+
+            for j in xrange(1, lx):
+                if x[j - 1] == y[i - 1]:
+                    substitution_cost = 0
+                else:
+                    substitution_cost = 1
+
+                # One of three operations will have to lowest cost. They are,
+                # in order, substitution (or nop), deletion and insertion.
+                current_row[j] = min(
+                    previous_row[j - 1] + substitution_cost,
+                    previous_row[j] + 1,
+                    current_row[j - 1] + 1)
+
+        return current_row[-1]
+
+    @classmethod
+    def reflect_static_args(cls):
+        return (six.string_types[0], six.string_types[0])
+
+    @classmethod
+    def reflect_static_return(cls):
+        return int
 
 
 # Aggregate functions (reducers):
@@ -95,6 +166,11 @@ class VectorSum(core.TypedReducer):
         return list
 
 
-MODULE = core.LibraryModule(name="stdmath",
-                            vars={Mean.name: Mean(),
-                                  Sum.name: Sum()})
+MODULE = core.LibraryModule(
+    name="stdmath",
+    vars={
+        Mean.name: Mean(),
+        Sum.name: Sum(),
+        LevenshteinDistance.name: LevenshteinDistance()
+    }
+)
