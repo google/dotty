@@ -20,10 +20,23 @@ except ImportError:
 # Change PYTHONPATH to include efilter so that we can get the version.
 sys.path.insert(0, ".")
 
-from efilter import version
+try:
+    from efilter.version import get_txt_version, get_version
+except ImportError:
+    # If we can't import EFILTER then we can't generate version from git, but
+    # can still just read the version file.
+    def get_version(_=None):
+        return get_txt_version()
+
+    def get_txt_version():
+        try:
+            with open("version.txt", "r") as fp:
+                return fp.read().strip()
+        except IOError:
+            return None
 
 
-__version__ = version.get_txt_version()
+__version__ = get_txt_version()
 
 
 class BdistRPMCommand(bdist_rpm):
@@ -97,7 +110,7 @@ class SDistCommand(sdist):
 
     def run(self):
         global __version__
-        __version__ = version.get_version(False)
+        __version__ = get_version(False)
         with open("version.txt", "w") as fd:
             fd.write(__version__)
 

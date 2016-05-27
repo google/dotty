@@ -33,6 +33,8 @@ from efilter import protocol
 from efilter import query as q
 from efilter import scope
 
+from efilter.ext import row_tuple
+
 from efilter.protocols import applicative
 from efilter.protocols import associative
 from efilter.protocols import boolean
@@ -81,8 +83,8 @@ def solve(query, vars):
 def __solve_for_repeated(expr, vars):
     """Helper: solve 'expr' always returning an IRepeated.
 
-    If the result of solving 'expr' is a list or a tuple of IAssociative objects
-    then treat is as a repeated value of IAssociative objects because that's
+    If the result of solving 'expr' is a list or a tuple of IStructured objects
+    then treat is as a repeated value of IStructured objects because that's
     what the called meant to do. This is a convenience helper so users of the
     API don't have to create IRepeated objects.
 
@@ -98,7 +100,7 @@ def __solve_for_repeated(expr, vars):
     """
     var = solve(expr, vars).value
     if (var and isinstance(var, (tuple, list))
-            and protocol.implements(var[0], associative.IAssociative)):
+            and protocol.implements(var[0], structured.IStructured)):
         return repeated.meld(*var)
 
     return var
@@ -107,12 +109,12 @@ def __solve_for_repeated(expr, vars):
 def __solve_for_scalar(expr, vars):
     """Helper: solve 'expr' always returning a scalar (not IRepeated).
 
-    If the output of 'expr' is a single value or a single dict with a single
-    value then return that value. Otherwise raise an EfilterTypeError.
+    If the output of 'expr' is a single value or a single RowTuple with a single
+    column then return the value in that column. Otherwise raise.
 
     Arguments:
         expr: Expression to solve.
-        varS: The scope.
+        vars: The scope.
 
     Returns:
         A scalar value (not an IRepeated).
@@ -129,11 +131,10 @@ def __solve_for_scalar(expr, vars):
             message="Wasn't expecting more than one value here. Got %r."
             % (var,))
 
-    if isinstance(scalar, associative.IAssociative):
-        keys = associative.getkeys(scalar)
-        if len(keys) == 1:
-            return associative.select(scalar, list(keys)[0])
-        else:
+    if isinstance(scalar, row_tuple.RowTuple):
+        try:
+            return scalar.get_singleton()
+        except ValueError:
             raise errors.EfilterTypeError(
                 root=expr, query=expr.source,
                 message="Was expecting a scalar value here. Got %r."
@@ -145,15 +146,15 @@ def __solve_for_scalar(expr, vars):
 def __solve_and_destructure_repeated(expr, vars):
     """Helper: solve 'expr' always returning a list of scalars.
 
-    If the output of 'expr' is one or more dicts (IAssociative) of a single
-    element then return a repeated value of those single elements. If the dicts
-    have more than one element each then raise.
+    If the output of 'expr' is one or more row tuples with only a single column
+    then return a repeated value of values in that column. If there are more
+    than one column per row then raise.
 
     This returns a list because there's no point in wrapping the scalars in
     a repeated value for use internal to the implementing solver.
 
     Returns:
-        A list (not an IRepeated!) of scalars.
+        An iterator (not an IRepeated!) of scalars.
 
     Raises:
         EfilterTypeError if the values don't conform.
@@ -161,29 +162,26 @@ def __solve_and_destructure_repeated(expr, vars):
     values = iter(__solve_for_repeated(expr, vars))
 
     try:
-        first_value = next(values)
+        value = next(values)
     except StopIteration:
-        return []
+        return
 
-    if not isinstance(first_value, associative.IAssociative):
-        results = [first_value]
+    if not isinstance(value, row_tuple.RowTuple):
+        yield value
         # We skip type checking the remaining values because it'd be slow.
-        results.extend(values)
-        return results
+        for value in values:
+            yield value
 
-    keys = associative.getkeys(first_value)
-    if len(keys) == 1:
-        key = list(keys)[0]
-    else:
+        return
+
+    try:
+        yield value.get_singleton()
+        for value in values:
+            yield value.get_singleton()
+    except ValueError:
         raise errors.EfilterTypeError(
             root=expr, query=expr.source,
-            message="Was expecting at most one key in %r." % (first_value,))
-
-    results = [associative.select(first_value, key)]
-    for value in values:
-        results.append(associative.select(value, key))
-
-    return results
+            message="Was expecting exactly one column in %r." % (value,))
 
 
 def __nest_scope(expr, outer, inner):
@@ -343,7 +341,7 @@ def solve_apply(expr, vars):
 
 @solve.implementation(for_type=ast.Bind)
 def solve_bind(expr, vars):
-    """Build a dict from key/value pairs under the bind.
+    """Build a RowTuple from key/value pairs under the bind.
 
     The Bind subtree is arranged as follows:
 
@@ -361,21 +359,20 @@ def solve_bind(expr, vars):
 
     bind(x: 5, y: x + 5)  # Will bind y = 10 because x is already available.
     """
-    result = {}
+    value_expressions = []
+    keys = []
+    for pair in expr.children:
+        keys.append(solve(pair.key, vars).value)
+        value_expressions.append(pair.value)
+
+    result = row_tuple.RowTuple(ordered_columns=keys)
     intermediate_scope = scope.ScopeStack(vars, result)
 
-    for pair in expr.children:
-        if not isinstance(pair, ast.Pair):
-            raise errors.EfilterError(
-                root=pair, query=expr.source,
-                message="Bind expression must consist of key/value pairs.")
-
-        key = solve(pair.key, intermediate_scope).value
-        value = solve(pair.value, intermediate_scope).value
-
+    for idx, value_expression in enumerate(value_expressions):
+        value = solve(value_expression, intermediate_scope).value
         # Update the intermediate bindings so as to make earlier bindings
         # already available to the next child-expression.
-        result[key] = value
+        result[keys[idx]] = value
 
     return Result(result, ())
 
@@ -779,7 +776,7 @@ def solve_regexfilter(expr, vars):
     string = __solve_for_scalar(expr.string, vars)
     pattern = __solve_for_scalar(expr.regex, vars)
 
-    return Result(re.compile(pattern).match(str(string)), ())
+    return Result(re.compile(pattern).search(six.text_type(string)), ())
 
 
 @solve.implementation(for_type=ast.StrictOrderedSet)

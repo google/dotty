@@ -359,6 +359,23 @@ class Reverse(TypedFunction):
         return repeated.IRepeated
 
 
+class Materialize(TypedFunction):
+    """Force a repeated value (e.g. output of map) to materialize in memory."""
+
+    name = "materialize"
+
+    def __call__(self, rv):
+        return repeated.repeated(*list(rv))
+
+    @classmethod
+    def reflect_static_args(cls):
+        return (repeated.IRepeated,)
+
+    @classmethod
+    def reflect_static_return(cls):
+        return repeated.IRepeated
+
+
 MODULE = LibraryModule(name="stdcore",
                        vars={Take.name: Take(),
                              Drop.name: Drop(),
@@ -368,6 +385,7 @@ MODULE = LibraryModule(name="stdcore",
                              Find.name: Find(),
                              SingletonReducer.name: SingletonReducer(),
                              First.name: First(),
+                             Materialize.name: Materialize(),
                              # Built-in types below:
                              "int": int,
                              "str": six.text_type,

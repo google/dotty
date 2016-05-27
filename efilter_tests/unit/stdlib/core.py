@@ -29,21 +29,45 @@ from efilter.stdlib import core
 
 class CoreTest(testlib.EfilterTestCase):
     def testFirst(self):
-        self.assertEqual(
-            core.First()(repeated.meld(1, 2, 3, 4)),
-            1)
+        self.assertEqual(core.First()(repeated.meld(1, 2, 3, 4)), 1)
 
-        self.assertEqual(
-            core.First()(1),
-            1)
+        self.assertEqual(core.First()(1), 1)
 
-        self.assertEqual(
-            core.First()([1, 2]),
-            [1, 2])
+        self.assertEqual(core.First()([1, 2]), [1, 2])
 
-        self.assertEqual(
-            core.First()(None),
-            None)
+        self.assertEqual(core.First()(None), None)
+
+    # Sigh. Python can't even do lexical scoping properly, which is why this
+    # is class-level instead of being function-local below (since the nested
+    # function can't see locals from the surrounding scope.)
+    __generator_has_run = None
+
+    def testMaterialize(self):
+        self.__generator_has_run = False
+
+        def _gen():
+            if self.__generator_has_run:
+                raise ValueError("This should only run once.")
+
+            self.__generator_has_run = True
+            yield 1
+            yield 2
+            yield 3
+
+        lazyseq = repeated.lazy(_gen)
+        self.assertValuesEqual(lazyseq, repeated.repeated(1, 2, 3))
+
+        # Accessing this for a second time should blow up.
+        with self.assertRaises(ValueError):
+            core.Materialize()(lazyseq)
+
+        # So let's reset and do this with a materialized seq.
+        self.__generator_has_run = False
+        materialized = core.Materialize()(lazyseq)
+        self.assertEqual(materialized, repeated.repeated(1, 2, 3))
+
+        # And a second time.
+        self.assertEqual(materialized, repeated.repeated(1, 2, 3))
 
     def testTake(self):
         self.assertValuesEqual(

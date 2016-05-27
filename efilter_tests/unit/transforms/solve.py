@@ -300,7 +300,7 @@ class SolveTest(testlib.EfilterTestCase):
 
         # Sorting BY a repeated expression should be the same as sorting by
         # a tuple.
-        self.assertEqual(
+        self.assertValuesEqual(
             solve.solve(
                 q.Query("select name, surname from people order by "
                         "[lower(surname), lower(name)]"),
@@ -321,7 +321,7 @@ class SolveTest(testlib.EfilterTestCase):
             )
         )
 
-        self.assertEqual(
+        self.assertValuesEqual(
             solve.solve(
                 q.Query("select name, surname from people order by "
                         "(lower(surname), lower(name))"),

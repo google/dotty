@@ -217,7 +217,7 @@ class Parser(syntax.Syntax):
             return self.application(
                 ast.Var(self.tokens.matched.value, source=self.original,
                         start=self.tokens.matched.start,
-                        end=self.tokens.matched.end))
+                        end=self.tokens.matched.first.end))
 
         if self.tokens.accept(common_grammar.symbol):
             return ast.Var(self.tokens.matched.value, source=self.original,

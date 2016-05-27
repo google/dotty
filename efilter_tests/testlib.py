@@ -26,6 +26,8 @@ import unittest
 
 from efilter import protocol
 
+from efilter.ext import row_tuple
+
 from efilter.protocols import repeated
 
 
@@ -65,10 +67,19 @@ class EfilterTestCase(unittest.TestCase):
     def assertIsa(self, t, p):
         self.assertTrue(protocol.isa(t, p), "%r is not type %r." % (t, p))
 
-    def assertItemsEqual(self, x, y):
+    def assertItemsEqual(self, xv, yv):
         """Sorted comparison in a way that prevents Python 3 from bitching."""
-        # This is a massive hack but works for tests.
-        self.assertEqual(sorted(x, key=repr), sorted(y, key=repr))
+        def _sortable_items(seq):
+            for x in seq:
+                if isinstance(x, dict):
+                    yield sorted(x.items())
+                elif isinstance(x, row_tuple.RowTuple):
+                    yield sorted(x.ordered_dict.items())
+                else:
+                    yield x
+
+        self.assertEqual(sorted(_sortable_items(xv)),
+                         sorted(_sortable_items(yv)))
 
     def assertValuesEqual(self, x, y):
         self.assertItemsEqual(repeated.getvalues(x), repeated.getvalues(y))
