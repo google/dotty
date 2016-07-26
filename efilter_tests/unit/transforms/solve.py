@@ -155,6 +155,16 @@ class SolveTest(testlib.EfilterTestCase):
             query = q.Query("(1, 'foo', 3, 4)")
             solve.solve(query, {})
 
+        # None should be skipped.
+        query = q.Query(
+            ast.Repeat(ast.Literal(None),
+                       ast.Literal(2),
+                       ast.Literal(None),
+                       ast.Literal(4)))
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            repeated.meld(2, 4))
+
     def testTuple(self):
         query = q.Query("[1, 2, 3]")
         self.assertEqual(

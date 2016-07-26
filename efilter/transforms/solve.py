@@ -159,7 +159,11 @@ def __solve_and_destructure_repeated(expr, vars):
     Raises:
         EfilterTypeError if the values don't conform.
     """
-    values = iter(__solve_for_repeated(expr, vars))
+    iterable = __solve_for_repeated(expr, vars)
+    if iterable is None:
+        return
+
+    values = iter(iterable)
 
     try:
         value = next(values)
