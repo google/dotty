@@ -88,8 +88,9 @@ class ParserTest(testlib.EfilterTestCase):
                     ast.Literal(2))),
             params=[1, 2])
 
+        # Test with a = as well as ==.
         self.assertQueryMatches(
-            "{bar} == 1 and {foo} == 2",
+            "{bar} = 1 and {foo} = 2",
             ast.Intersection(
                 ast.Equivalence(
                     ast.Literal("foo"),
