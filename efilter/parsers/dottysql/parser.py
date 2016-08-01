@@ -437,7 +437,11 @@ class Parser(syntax.Syntax):
                        end=self.tokens.matched.end, source=self.original)
 
     def _guess_name_of(self, expr):
-        """Tries to guess what variable name 'expr' ends in."""
+        """Tries to guess what variable name 'expr' ends in.
+
+        This is a heuristic that roughly emulates what most SQL databases
+        name columns, based on selected variable names or applied functions.
+        """
         if isinstance(expr, ast.Var):
             return expr.value
 
@@ -446,13 +450,21 @@ class Parser(syntax.Syntax):
             # Parser.dot_rhs does.
             return expr.rhs.value
 
+        if isinstance(expr, ast.Select) and isinstance(expr.rhs, ast.Literal):
+            name = self._guess_name_of(expr.lhs)
+            if name is not None:
+                return "%s_%s" % (name, expr.rhs.value)
+
+        if isinstance(expr, ast.Apply) and isinstance(expr.func, ast.Var):
+            return expr.func.value
+
     def select_what(self):
         # Each value we select is in form EXPRESSION [AS SYMBOL]. Values are
         # separated by commas.
         start = self.tokens.matched.start
         used_names = set()  # Keeps track of named values to prevent duplicates.
         vars = []
-        for watermark in itertools.count():
+        for idx in itertools.count():
             value_expression = self.expression()
 
             if self.tokens.accept(grammar.select_as):
@@ -469,13 +481,13 @@ class Parser(syntax.Syntax):
                                              source=self.original)
                 used_names.add(self.tokens.matched.value)
             else:
-                # If the value expression is a map of var (x.y.z...) then
-                # we can guess the name from the last var.
+                # Try to guess the appropriate name of the column based on what
+                # the expression is.
                 name = self._guess_name_of(value_expression)
 
                 if not name or name in used_names:
-                    # Give up and just use the current watermark for key.
-                    name = watermark
+                    # Give up and just use the current idx for key.
+                    name = "column_%d" % (idx,)
                 else:
                     used_names.add(name)
 

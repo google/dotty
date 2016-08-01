@@ -44,8 +44,8 @@ class AsLispTest(unittest.TestCase):
                         (".", ("var", "proc"), "command"), "init")),
                 ("bind",
                     (":", "pid", (".", ("var", "proc"), "pid")),
-                    (":",
-                        1, (".", (".", ("var", "proc"), "parent"), "pid"))))
+                    (":", "column_1",
+                        (".", (".", ("var", "proc"), "parent"), "pid"))))
 
         self.assertEqual(aslisp.aslisp(query), expected)
 

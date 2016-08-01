@@ -524,7 +524,12 @@ class ParserTest(testlib.EfilterTestCase):
 
     def testSelectWhat(self):
         self.assertQueryMatches(
-            "SELECT proc.parent.pid AS ppid, proc.pid, 'foo' FROM pslist()",
+            "SELECT proc.parent.pid AS ppid,"
+            "proc.pid,"
+            "'foo',"
+            "asdate(proc.starttime),"
+            "proc.fd[5]"
+            "FROM pslist()",
             ast.Map(
                 ast.Apply(
                     ast.Var("pslist")),
@@ -542,8 +547,22 @@ class ParserTest(testlib.EfilterTestCase):
                             ast.Var("proc"),
                             ast.Literal("pid"))),
                     ast.Pair(
-                        ast.Literal(2),
-                        ast.Literal("foo")))))
+                        ast.Literal("column_2"),
+                        ast.Literal("foo")),
+                    ast.Pair(
+                        ast.Literal("asdate"),
+                        ast.Apply(
+                            ast.Var("asdate"),
+                            ast.Resolve(
+                                ast.Var("proc"),
+                                ast.Literal("starttime")))),
+                    ast.Pair(
+                        ast.Literal("fd_5"),
+                        ast.Select(
+                            ast.Resolve(
+                                ast.Var("proc"),
+                                ast.Literal("fd")),
+                            ast.Literal(5))))))
 
     def testFullSelect(self):
         query = ("SELECT proc.parent.pid AS ppid, proc.pid"
