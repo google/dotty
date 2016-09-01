@@ -483,24 +483,63 @@ class SolveTest(testlib.EfilterTestCase):
                                     mocks.Process(1, None, None)).value)
 
     def testMembership(self):
-        self.assertTrue(solve.solve(q.Query("pid in [1, 2]"),
-                                    mocks.Process(1, None, None)).value)
+        # Support tuples (lists):
+        self.assertTrue(
+            solve.solve(q.Query("x in [1, 2, 3, 4]"), {"x": 2}).value)
+        self.assertFalse(solve.solve(q.Query("5 in [1, 2, 3, 4]"), {}).value)
 
-        # Repeated should work, too.
-        self.assertTrue(solve.solve(q.Query("pid in (1, 2)"),
-                                    mocks.Process(1, None, None)).value)
+        # Support tuples of strings:
+        self.assertTrue(
+            solve.solve(q.Query("'foo' in ['bar', 'foo']"), {}).value)
+        self.assertTrue(
+            solve.solve(q.Query("'baz' not in ['bar', 'foo']"), {}).value)
 
-        # Strings can be in strings.
+        # Repeated values:
+        self.assertTrue(
+            solve.solve(q.Query("'foo' in ('bar', 'foo')"), {}).value)
+
+        # Strings can be in strings:
         self.assertTrue(solve.solve(q.Query("'foo' in 'foobar'"), {}).value)
+        self.assertTrue(solve.solve(q.Query("'foo' in ('foobar')"), {}).value)
+        self.assertTrue(solve.solve(q.Query("'baz' not in 'foobar'"), {}).value)
 
-        # True negative.
-        self.assertFalse(solve.solve(q.Query("'foo' in 'bar'"), {}).value)
+        # This should behave as expected - a singleton string is distinct from a
+        # string if in a list, but not in a repeated value.
+        self.assertTrue(
+            solve.solve(q.Query("'foo' not in ['foobar']"), {}).value)
 
-        # This should also work for strings.
-        self.assertTrue(solve.solve(q.Query("'foo' in 'foobar'"), {}).value)
-        self.assertFalse(solve.solve(q.Query("'fzz' in 'foobar'"), {}).value)
+        # All this should be true for vars as well as literals:
+        self.assertTrue(
+            solve.solve(q.Query("'foo' not in [x]"), {"x": "foobar"}).value)
+        self.assertTrue(
+            solve.solve(q.Query("'foo' in x"), {"x": "foobar"}).value)
+        self.assertTrue(
+            solve.solve(q.Query("'foo' in (x)"), {"x": "foobar"}).value)
 
-        # Single characters.
+        # Make sure this is all working for unicode strings as well.
+        self.assertTrue(
+            solve.solve(q.Query("'foo' in (x)"), {"x": u"foobar"}).value)
+        self.assertTrue(
+            solve.solve(
+                q.Query(ast.Membership(ast.Literal(u"foo"),
+                                       ast.Literal(u"foobar"))), {}).value)
+
+        # Repeated values behave correctly.
+        self.assertTrue(
+            solve.solve(q.Query("'foo' in x"),
+                        {"x": repeated.meld("foo", "bar")}).value)
+        self.assertTrue(
+            solve.solve(q.Query("'foo' not in x"),
+                        {"x": repeated.meld("foobar", "bar")}).value)
+
+        # This is where it gets tricky: a repeated value of a single value is
+        # equal to the single value - this is how EFILTER is supposed to work.
+        # In this case it may be unexpected, but them's the breaks.
+        self.assertTrue(
+            solve.solve(q.Query("'foo' not in ('foobar', 'bar')"), {}).value)
+        self.assertTrue(solve.solve(q.Query("'foo' in ('foobar')"), {}).value)
+
+        # Single characters should behave correctly.
         self.assertTrue(solve.solve(q.Query("'f' in 'foo'"), {}).value)
 
     def testRegexFilter(self):

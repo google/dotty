@@ -38,6 +38,7 @@ from efilter.ext import row_tuple
 from efilter.protocols import applicative
 from efilter.protocols import associative
 from efilter.protocols import boolean
+from efilter.protocols import counted
 from efilter.protocols import number
 from efilter.protocols import ordered
 from efilter.protocols import reducer
@@ -97,13 +98,14 @@ def __solve_for_repeated(expr, vars):
 
     Returns:
         IRepeated result of solving 'expr'.
+        A booelan to indicate whether the original was repeating.
     """
     var = solve(expr, vars).value
     if (var and isinstance(var, (tuple, list))
             and protocol.implements(var[0], structured.IStructured)):
-        return repeated.meld(*var)
+        return repeated.meld(*var), False
 
-    return var
+    return var, repeated.isrepeating(var)
 
 
 def __solve_for_scalar(expr, vars):
@@ -154,34 +156,39 @@ def __solve_and_destructure_repeated(expr, vars):
     a repeated value for use internal to the implementing solver.
 
     Returns:
-        An iterator (not an IRepeated!) of scalars.
+        Two values:
+         - An iterator (not an IRepeated!) of scalars.
+         - A boolean to indicate whether the original value was repeating.
 
     Raises:
         EfilterTypeError if the values don't conform.
     """
-    iterable = __solve_for_repeated(expr, vars)
+    iterable, isrepeating = __solve_for_repeated(expr, vars)
     if iterable is None:
-        return
+        return (), isrepeating
+
+    if not isrepeating:
+        return [iterable], False
 
     values = iter(iterable)
 
     try:
         value = next(values)
     except StopIteration:
-        return
+        return (), True
 
     if not isinstance(value, row_tuple.RowTuple):
-        yield value
+        result = [value]
         # We skip type checking the remaining values because it'd be slow.
-        for value in values:
-            yield value
-
-        return
+        result.extend(values)
+        return result, True
 
     try:
-        yield value.get_singleton()
+        result = [value.get_singleton()]
         for value in values:
-            yield value.get_singleton()
+            result.append(value.get_singleton())
+
+        return result, True
     except ValueError:
         raise errors.EfilterTypeError(
             root=expr, query=expr.source,
@@ -257,7 +264,7 @@ def solve_select(expr, vars):
     selecting from a repeated value implies a map-like operation and returns a
     new repeated value.
     """
-    data = __solve_for_repeated(expr.lhs, vars)
+    data, _ = __solve_for_repeated(expr.lhs, vars)
     key = solve(expr.rhs, vars).value
 
     try:
@@ -289,7 +296,7 @@ def solve_resolve(expr, vars):
     resolving from a repeated value implies a map-like operation and returns a
     new repeated values.
     """
-    objs = __solve_for_repeated(expr.lhs, vars)
+    objs, _ = __solve_for_repeated(expr.lhs, vars)
     member = solve(expr.rhs, vars).value
 
     try:
@@ -425,7 +432,7 @@ def solve_map(expr, vars):
     evaluate to {"name": "Bob"}, which subdict will then be used on the RHS as
     new vars, and that whole form will evaluate to "Bob".
     """
-    lhs_values = __solve_for_repeated(expr.lhs, vars)
+    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
 
     def lazy_map():
         try:
@@ -458,7 +465,7 @@ def solve_filter(expr, vars):
 
     Returns any LHS values for which RHS evaluates to a true value.
     """
-    lhs_values = __solve_for_repeated(expr.lhs, vars)
+    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
 
     def lazy_filter():
         for lhs_value in repeated.getvalues(lhs_values):
@@ -482,7 +489,7 @@ def solve_reducer(expr, vars):
 
 @solve.implementation(for_type=ast.Group)
 def solve_group(expr, vars):
-    rows = __solve_for_repeated(expr.lhs, vars)
+    rows, _ = __solve_for_repeated(expr.lhs, vars)
     reducers = [solve(child, vars).value for child in expr.reducers]
     r = reducer.Compose(*reducers)
     intermediates = {}
@@ -520,7 +527,7 @@ def solve_group(expr, vars):
 @solve.implementation(for_type=ast.Sort)
 def solve_sort(expr, vars):
     """Sort values on the LHS by the value they yield when passed to RHS."""
-    lhs_values = repeated.getvalues(__solve_for_repeated(expr.lhs, vars))
+    lhs_values = repeated.getvalues(__solve_for_repeated(expr.lhs, vars)[0])
 
     sort_expression = expr.rhs
 
@@ -542,7 +549,7 @@ def solve_each(expr, vars):
     IAssociative objects then RHS will be evaluated with each state and True
     will be returned only if each result is true.
     """
-    lhs_values = __solve_for_repeated(expr.lhs, vars)
+    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
 
     for lhs_value in repeated.getvalues(lhs_values):
         result = solve(expr.rhs, __nest_scope(expr.lhs, vars, lhs_value))
@@ -556,7 +563,7 @@ def solve_each(expr, vars):
 @solve.implementation(for_type=ast.Any)
 def solve_any(expr, vars):
     """Same as Each, except returning True on first true result at LHS."""
-    lhs_values = __solve_for_repeated(expr.lhs, vars)
+    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
 
     try:
         rhs = expr.rhs
@@ -759,20 +766,51 @@ def solve_equivalence(expr, vars):
 
 @solve.implementation(for_type=ast.Membership)
 def solve_membership(expr, vars):
+    # There is an expectation that "foo" in "foobar" will be true, and,
+    # simultaneously, that "foo" in ["foobar"] will be false. This is how the
+    # analogous operator works in Python, among other languages. Where this
+    # mental model breaks down is around repeated values, because, in EFILTER,
+    # there is no difference between a tuple of one value and the one value,
+    # so that "foo" in ("foobar") is true, while "foo" in ("foobar", "bar") is
+    # false and "foo" in ("foo", "bar") is again true. These semantics are a
+    # little unfortunate, and it may be that, in the future, the in operator
+    # is disallowed on repeated values to prevent ambiguity.
     needle = solve(expr.element, vars).value
+    if repeated.isrepeating(needle):
+        raise errors.EfilterError(
+            root=expr.element, query=expr.source,
+            message=("More than one value not allowed in the needle. "
+                     "Got %d values.") % counted.count(needle))
 
-    # There is an expectation that "foo" in "foobar" will be true, while at
-    # the same time that "foo" in ["foobar", "fuzz"] will be false. The
-    # expectation probably comes down to the fact that this is how the 'in'
-    # operator behaves in other languages, such as Python. To meet the
-    # expectation, we treat as special the case where the RHS is a literal
-    # string value.
-    if (isinstance(expr.set, ast.Literal)
-            and isinstance(expr.set.value, six.string_types)):
-        return Result(needle in expr.set.value, ())
+    # We need to fall through to __solve_and_destructure_repeated to handle
+    # row tuples correctly.
+    haystack, isrepeating = __solve_and_destructure_repeated(expr.set, vars)
 
-    values = __solve_and_destructure_repeated(expr.set, vars)
-    return Result(needle in values, ())
+    # For non-repeated values just use the first (singleton) value.
+    if not isrepeating:
+        for straw in haystack:
+            haystack = straw
+            break
+
+    if isinstance(haystack, six.string_types):
+        return Result(needle in haystack, ())
+
+    # Repeated values of more than one value and collections behave the same.
+    # There are no proper sets in EFILTER so O(N) is what we get.
+    if isrepeating or isinstance(haystack, (tuple, list)):
+        for straw in haystack:  # We're all farmers here.
+            if straw == needle:
+                return Result(True, ())
+
+        return Result(False, ())
+
+    # If haystack is not a repeating value, but it is iterable then it must
+    # have originated from outside EFILTER. Lets try to do the right thing and
+    # delegate to Python.
+    for straw in haystack:
+        return Result(needle in straw, None)
+
+    return Result(False, ())
 
 
 @solve.implementation(for_type=ast.RegexFilter)
