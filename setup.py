@@ -119,6 +119,14 @@ class SDistCommand(sdist):
         sdist.run(self)
 
 
+efilter_version = __version__
+if (efilter_version[1] == "!" and (
+    "bdist_msi" in sys.argv or "bdist_rpm" in sys.argv)):
+  # bdist_msi and bdist_rpm do not support a setuptools epoch version so
+  # we remove it as a work around.
+  _, _, efilter_version = efilter_version.partition("!")
+
+
 setup(name="efilter",
       version=__version__,
       description="EFILTER query language",
