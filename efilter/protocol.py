@@ -233,14 +233,14 @@ class Protocol(six.with_metaclass(abc.ABCMeta, object)):
             name as the contents of 'func_name' on the 'obj' object with the
             arguments from *args.
         """
-        def _late_dynamic_dispatcher(obj, *args):
+        def _late_dynamic_dispatcher(obj, *args, **kw):
             method = getattr(obj, func_name, None)
             if not callable(method):
                 raise NotImplementedError(
                     "Instance method %r is not implemented by %r." % (
                         func_name, obj))
 
-            return method(*args)
+            return method(*args, **kw)
 
         return _late_dynamic_dispatcher
 

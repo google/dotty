@@ -25,6 +25,24 @@ from efilter import protocol
 from efilter.protocols import structured
 
 
+class Scope(dict):
+    def __init__(self, other):
+        if not protocol.implements(other, structured.IStructured):
+            raise TypeError("Can only set scope from IStructured.")
+
+        for key in structured.getmembers_runtime(other):
+            self[key] = structured.resolve(other, key)
+
+
+# Lets us pretend that dicts are objects, which makes it easy for users to
+# declare variables.
+structured.IStructured.implement(
+    for_type=Scope,
+    implementations={
+        structured.resolve: lambda d, m: d[m],
+        structured.getmembers_runtime: lambda d: d.keys()})
+
+
 class ScopeStack(object):
     """Stack of IStructured scopes from global to local.
 
@@ -58,10 +76,12 @@ class ScopeStack(object):
         for scope in scopes:
             if isinstance(scope, type(self)):
                 flattened_scopes.extend(scope.scopes)
+            elif isinstance(scope, Scope):
+                flattened_scopes.append(scope)
             elif isinstance(scope, type):
-                flattened_scopes.append(scope)
+                flattened_scopes.append(Scope(scope))
             elif protocol.implements(scope, structured.IStructured):
-                flattened_scopes.append(scope)
+                flattened_scopes.append(Scope(scope))
             else:
                 raise TypeError("Scopes must be instances or subclasses of "
                                 "IStructured; got %r." % (scope,))
