@@ -80,9 +80,57 @@ class IStructured(protocol.Protocol):
                            getmembers_static, getmembers_runtime)
 
 
-# Lets us pretend that dicts are objects, which makes it easy for users to
-# declare variables.
+# Lets us pretend that dicts are objects, which makes it easy for
+# users to declare variables. We ignore attribute errors which allows
+# users to select arbitrary fields without raising exceptions.
 IStructured.implement(for_type=dict,
                       implementations={
-                          resolve: lambda d, m: d[m],
+                          resolve: lambda d, m: d.get(m),
                           getmembers_runtime: lambda d: d.keys()})
+
+
+
+# Support named tuples. These are really tuples but we need to access
+# them like an object. The named tuple MRO looks like this:
+# (Foo, tuple, object)
+
+# So it is inconvenient to install handlers at each specific type of
+# named tuple.
+def IStructured_getmembers_runtime(item):
+    # Is it a named tuple? Acts like a dict.
+    if hasattr(item, "_fields"):
+        return item._fields
+
+    try:
+        return getmembers(item[0])
+    except IndexError:
+        return []
+
+
+def IStructured_resolve_list(item, member):
+    # Named tuples.
+    if hasattr(item, "_fields"):
+        return getattr(item, member)
+
+    if len(item) > 0:
+        return resolve(item[0], member)
+
+    return None
+
+IStructured.implement(
+    for_types=(list, tuple),
+    implementations={
+        resolve: IStructured_resolve_list,
+        getmembers_runtime: IStructured_getmembers_runtime,
+    })
+
+
+# If a None appears as a field but we wanted to dereference it we should just
+# ignore the error and propagate the None.
+IStructured.implement(
+    for_type=type(None),
+    implementations={
+        resolve: lambda x: None,
+        getmembers_runtime: lambda x: [],
+    }
+)

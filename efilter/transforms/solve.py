@@ -364,11 +364,6 @@ def solve_bind(expr, vars):
     | | Second Key Expression
     | | Second Value Expression
     Etc...
-
-    As we evaluate the subtree, each subsequent KV pair is evaluated with
-    the all previous bingings already in scope. For example:
-
-    bind(x: 5, y: x + 5)  # Will bind y = 10 because x is already available.
     """
     value_expressions = []
     keys = []
@@ -377,12 +372,8 @@ def solve_bind(expr, vars):
         value_expressions.append(pair.value)
 
     result = row_tuple.RowTuple(ordered_columns=keys)
-    intermediate_scope = scope.ScopeStack(vars, result)
-
     for idx, value_expression in enumerate(value_expressions):
-        value = solve(value_expression, intermediate_scope).value
-        # Update the intermediate bindings so as to make earlier bindings
-        # already available to the next child-expression.
+        value = solve(value_expression, vars).value
         result[keys[idx]] = value
 
     return Result(result, ())
@@ -815,10 +806,22 @@ def solve_membership(expr, vars):
 
 @solve.implementation(for_type=ast.RegexFilter)
 def solve_regexfilter(expr, vars):
-    string = __solve_for_scalar(expr.string, vars)
-    pattern = __solve_for_scalar(expr.regex, vars)
+    """A Regex filter which can operate on both strings and repeated.
 
-    return Result(re.compile(pattern).search(six.text_type(string)), ())
+    If any item in the array matches, we return the entire row.
+    """
+    pattern = re.compile(__solve_for_scalar(expr.regex, vars), re.I)
+    try:
+        string = __solve_for_scalar(expr.string, vars)
+        return Result(pattern.search(six.text_type(string)), ())
+    except errors.EfilterTypeError:
+        for item in __solve_for_repeated(expr.string, vars):
+            string = unicode(item)
+            match = pattern.search(six.text_type(string))
+            if match:
+                return Result(match, ())
+
+    return Result(match, ())
 
 
 @solve.implementation(for_type=ast.StrictOrderedSet)
