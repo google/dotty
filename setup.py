@@ -119,7 +119,7 @@ class SDistCommand(sdist):
         sdist.run(self)
 
 
-setup(name="efilter",
+setup(name="rekall-efilter",
       version=__version__,
       description="EFILTER query language",
       long_description=(
