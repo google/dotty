@@ -97,20 +97,18 @@ class LazyRepetition(object):
         # Iteration stopped - check if we're at the previous watermark and raise
         # if not.
         if idx + 1 < self._watermark:
-            raise ValueError(
-                "LazyRepetition %r was previously able to iterate its"
-                " generator up to idx %d, but this time iteration stopped after"
-                " idx %d! Generator function %r is not stable." %
-                (self, self._watermark, idx + 1, self._generator_func))
+            # for rekall, this check is too strict, since in live-mode
+            # repeated analysis can yield different results
+            pass
+
 
         # Watermark is higher than previous count! Generator function returned
         # more values this time than last time.
         if self._count is not None and self._watermark >= self._count:
-            raise ValueError(
-                "LazyRepetition %r previously iterated only up to idx %d but"
-                " was now able to reach idx %d! Generator function %r is not"
-                " stable." %
-                (self, self._count - 1, idx + 1, self._generator_func))
+            # for rekall, this check is too strict, since in live-mode
+            # repeated analysis can yield different results
+            pass
+
 
         # We've finished iteration - cache count. After this the count will be
         # watermark + 1 forever.
