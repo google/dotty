@@ -18,6 +18,7 @@
 Implements IRepeated using a list container.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter.protocols import repeated
@@ -99,5 +100,5 @@ class ListRepetition(object):
 
 
 repeated.IRepeated.implicit_static(ListRepetition)
-repeated.repeated.implement(for_type=object,
+repeated.repeated.implement(for_type=object.__mro__[-1],
                             implementation=ListRepetition)

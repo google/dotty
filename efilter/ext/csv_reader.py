@@ -18,6 +18,7 @@
 Implements IRepeated for text files and some common formats.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 

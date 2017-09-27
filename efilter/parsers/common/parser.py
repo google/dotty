@@ -18,6 +18,7 @@
 This module implements a customizable precedence-climbing parser.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import ast

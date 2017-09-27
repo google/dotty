@@ -18,6 +18,8 @@
 Implements IRepeated using a restartable generator.
 """
 
+from builtins import next
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter.protocols import counted
@@ -101,14 +103,12 @@ class LazyRepetition(object):
             # repeated analysis can yield different results
             pass
 
-
         # Watermark is higher than previous count! Generator function returned
         # more values this time than last time.
         if self._count is not None and self._watermark >= self._count:
             # for rekall, this check is too strict, since in live-mode
             # repeated analysis can yield different results
             pass
-
 
         # We've finished iteration - cache count. After this the count will be
         # watermark + 1 forever.
@@ -147,5 +147,8 @@ class LazyRepetition(object):
 
 
 repeated.IRepeated.implicit_static(LazyRepetition)
-repeated.lazy.implement(for_type=object, implementation=LazyRepetition)
+# We really mean the toplevel object whatever this is (due to futurize
+# this might be futurize.builtins.newobject)
+repeated.lazy.implement(for_type=object.__mro__[-1],
+                        implementation=LazyRepetition)
 counted.ICounted.implicit_static(LazyRepetition)

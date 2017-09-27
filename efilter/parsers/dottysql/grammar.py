@@ -18,6 +18,7 @@
 This module implements the DottySQL grammar (on tokens, not on a query string).
 """
 
+from builtins import next
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import ast

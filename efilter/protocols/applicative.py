@@ -68,6 +68,15 @@ def reflect_runtime_return(applicative):
     return reflect_static_return(type(applicative))
 
 
+@dispatch.multimethod
+def isapplicative(x):
+    if (isinstance(x, IApplicative) or
+            (isinstance(x, type) and issubclass(x, IApplicative))):
+        return True
+
+    return False
+
+
 class IApplicative(protocol.Protocol):
     _required_functions = (apply,)
     _optional_functions = (reflect_static_return, reflect_runtime_return,

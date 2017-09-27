@@ -86,8 +86,7 @@ class IStructured(protocol.Protocol):
 IStructured.implement(for_type=dict,
                       implementations={
                           resolve: lambda d, m: d.get(m),
-                          getmembers_runtime: lambda d: d.keys()})
-
+                          getmembers_runtime: lambda d: list(d.keys())})
 
 
 # Support named tuples. These are really tuples but we need to access
@@ -116,6 +115,7 @@ def IStructured_resolve_list(item, member):
         return resolve(item[0], member)
 
     return None
+
 
 IStructured.implement(
     for_types=(list, tuple),

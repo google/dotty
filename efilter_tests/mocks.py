@@ -18,6 +18,7 @@
 EFILTER test helpers.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import collections
@@ -56,7 +57,7 @@ class Process(collections.namedtuple("Process", ["pid", "name", "parent"])):
 
     @classmethod
     def getkeys(cls):
-        return PROCESS_DEFS.keys()
+        return list(PROCESS_DEFS.keys())
 
     def resolve(self, name):
         return getattr(self, name)
@@ -82,7 +83,7 @@ class _proc(collections.namedtuple("_proc", ["p_pid", "p_comm", "p_ppid"])):
 
     @classmethod
     def getkeys(cls):
-        return PROC_DEFS.keys()
+        return list(PROC_DEFS.keys())
 
     def resolve(self, name):
         return getattr(self, name)
@@ -120,9 +121,14 @@ class MockRootType(object):
         if var:
             return repeated.value_type(var)
 
+    def reflect_runtime_member(self, name):
+        var = self.DATA.get(name)
+        if var:
+            return repeated.value_type(var)
+
     @classmethod
     def getmembers_static(cls):
-        return cls.DATA.keys()
+        return list(cls.DATA.keys())
 
 
 structured.IStructured.implicit_static(MockRootType)

@@ -18,6 +18,7 @@
 EFILTER test suite.
 """
 
+from builtins import str
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter_tests import testlib

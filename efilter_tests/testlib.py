@@ -18,6 +18,7 @@
 EFILTER test helpers.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import os
@@ -42,10 +43,9 @@ def get_fixture_path(name):
 
 class EfilterTestCase(unittest.TestCase):
     def runPythonScript(self, script_path, args=()):
-        cmd = [os.path.join(os.getcwd(), script_path)]
+        cmd = ["python", os.path.join(os.getcwd(), script_path)]
         cmd.extend(args)
         proc = subprocess.Popen(args=cmd,
-                                env={"PYTHONPATH": os.getcwd()},
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()

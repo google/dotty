@@ -38,7 +38,7 @@ class ValidateTest(testlib.EfilterTestCase):
 
     def testValueExpression(self):
         q = query.Query("proc.pid + 5")
-        self.assertTrue(validate.validate(q, mocks.MockRootType))
+        self.assertTrue(validate.validate(q, mocks.MockRootType()))
 
     def testIfElse(self):
         # Missing else:
@@ -60,7 +60,7 @@ class ValidateTest(testlib.EfilterTestCase):
         # Numbers implement IBoolean so this should work.
         q = query.Query("not 5")
         self.assertTrue(validate.validate(q),
-                        mocks.MockRootType)
+                        mocks.MockRootType())
 
     def testBinaryExpression(self):
         q = query.Query("5.member")

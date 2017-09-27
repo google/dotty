@@ -18,6 +18,8 @@
 EFILTER individual object filter and matcher.
 """
 
+from builtins import next
+from builtins import str
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 # pylint: disable=function-redefined
@@ -364,17 +366,24 @@ def solve_bind(expr, vars):
     | | Second Key Expression
     | | Second Value Expression
     Etc...
+
+    The tree is traversed in order and the key is inserted into the
+    scope after each definition. This allows one bind pair to use keys
+    defined in a previous bind pair.
     """
-    value_expressions = []
+    local_scope = vars
+    values = []
     keys = []
     for pair in expr.children:
-        keys.append(solve(pair.key, vars).value)
-        value_expressions.append(pair.value)
+        key = solve(pair.key, local_scope).value
+        keys.append(key)
+        value = solve(pair.value, local_scope).value
+        values.append(value)
+        local_scope = scope.ScopeStack(local_scope, {key: value})
 
     result = row_tuple.RowTuple(ordered_columns=keys)
-    for idx, value_expression in enumerate(value_expressions):
-        value = solve(value_expression, vars).value
-        result[keys[idx]] = value
+    for k, v in zip(keys, values):
+        result[k] = v
 
     return Result(result, ())
 
@@ -816,7 +825,7 @@ def solve_regexfilter(expr, vars):
         return Result(pattern.search(six.text_type(string)), ())
     except errors.EfilterTypeError:
         for item in __solve_for_repeated(expr.string, vars):
-            string = unicode(item)
+            string = str(item)
             match = pattern.search(six.text_type(string))
             if match:
                 return Result(match, ())

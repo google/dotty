@@ -152,10 +152,10 @@ def infer_type(expr, scope):
 def infer_type(expr, scope):
     func_type = infer_type(expr.func, scope)
 
-    try:
-        return applicative.reflect_return(func_type) or protocol.AnyType
-    except NotImplementedError:
-        return protocol.AnyType
+    if applicative.isapplicative(func_type):
+        return applicative.reflect_return(func_type)
+
+    return func_type
 
 
 @infer_type.implementation(for_type=ast.Repeat)
@@ -166,8 +166,7 @@ def infer_type(expr, scope):
 
 @infer_type.implementation(for_type=ast.Map)
 def infer_type(expr, scope):
-    t = infer_type(expr.context, scope)
-    return infer_type(expr.expression, s.ScopeStack(scope, t))
+    return infer_type(expr.expression, scope)
 
 
 @infer_type.implementation(for_type=ast.Filter)

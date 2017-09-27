@@ -18,6 +18,8 @@
 EFILTER query wrapper.
 """
 
+from builtins import str
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import six
@@ -108,10 +110,10 @@ class Query(object):
             self.source = formatter(self.root)
 
     def __str__(self):
-        return unicode(self)
+        return str(self)
 
     def __unicode__(self):
-        return unicode(self.source)
+        return str(self.source)
 
     def __repr__(self):
         return "Query(%s)" % repr(self.source)

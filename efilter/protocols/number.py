@@ -17,7 +17,9 @@
 # limitations under the License.
 
 """EFILTER abstract type system."""
+from __future__ import division
 
+from past.utils import old_div
 import six
 
 from efilter import dispatch
@@ -60,6 +62,6 @@ INumber.implement(
         sum: lambda x, y: x + y,
         product: lambda x, y: x * y,
         difference: lambda x, y: x - y,
-        quotient: lambda x, y: x / y
+        quotient: lambda x, y: x // y
     }
 )

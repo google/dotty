@@ -84,12 +84,11 @@ class IAssociative(protocol.Protocol):
                            getkeys_runtime, getkeys_static)
 
 
-
-
 IAssociative.implement(for_type=dict,
                        implementations={
                            select: lambda d, key: d[key],
-                           getkeys_runtime: lambda d: d.keys()})
+                           getkeys_runtime: lambda d: list(d.keys())})
+
 
 def IAssociative_select(c, idx):
     """Out of bound reference just returns None."""
@@ -97,6 +96,7 @@ def IAssociative_select(c, idx):
         return c[idx]
     except IndexError:
         return None
+
 
 IAssociative.implement(
     for_types=(list, tuple),

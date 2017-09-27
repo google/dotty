@@ -18,6 +18,7 @@
 EFILTER DottySQL syntax output.
 """
 
+from builtins import next
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import six

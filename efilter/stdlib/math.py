@@ -17,7 +17,10 @@
 """
 (EXPERIMENTAL) EFILTER stdlib - math module.
 """
+from __future__ import division
 
+from builtins import next
+from past.utils import old_div
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import six

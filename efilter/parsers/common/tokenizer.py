@@ -18,6 +18,8 @@
 This module implements a reusable expression tokenizer.
 """
 
+from builtins import next
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 

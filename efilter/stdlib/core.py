@@ -22,12 +22,15 @@ as the base classes TypedFunction and LibraryModule, which are used to represent
 stdlib functions and modules.
 """
 
+from builtins import next
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 
 import itertools
-import six
 import threading
+
+import six
 
 from efilter import protocol
 
@@ -172,7 +175,7 @@ class LibraryModule(object):
         return "LibraryModule(name=%r, vars=%r)" % (self.name, self.vars)
 
     def getmembers_runtime(self):
-        return self.vars.keys()
+        return list(self.vars.keys())
 
     def resolve(self, name):
         return self.vars[name]

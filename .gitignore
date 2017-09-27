@@ -28,3 +28,6 @@ buildchk_wnet_*
 objchk_wnet_*
 .scons*
 *.swp
+
+*.whl
+*.egg-info/

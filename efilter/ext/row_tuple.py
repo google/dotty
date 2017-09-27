@@ -18,6 +18,7 @@
 Implements IStructured with a RowTuple to represent rows of output from SELECTS.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import collections
@@ -189,6 +190,10 @@ class RowTuple(object):
     def __eq__(self, other):
         if isinstance(other, type(self)):
             return self.ordered_dict == other.ordered_dict
+
+        elif isinstance(other, (tuple, list)):
+            return list(self) == list(other)
+
         elif isinstance(other, structured.IStructured):
             try:
                 other_members = structured.getmembers(other)
@@ -202,13 +207,12 @@ class RowTuple(object):
             vals = tuple([self.get(m) for m in members])
             other_vals = tuple([structured.resolve(other, m) for m in members])
             return vals == other_vals
-        elif isinstance(other, (tuple, list)):
-            return list(self) == list(other)
         else:
             return None
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
 
 associative.IAssociative.implicit_static(RowTuple)
 counted.ICounted.implicit_static(RowTuple)
