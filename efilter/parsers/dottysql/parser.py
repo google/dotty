@@ -84,8 +84,9 @@ class Parser(syntax.Syntax):
     last_param = 0
     tokens = None
 
-    def __init__(self, original, params=None):
+    def __init__(self, original, params=None, scope=None):
         super(Parser, self).__init__(original)
+        self.scope = scope
 
         self.tokens = token_stream.TokenStream(
             tokenizer.LazyTokenizer(self.original))
@@ -485,7 +486,9 @@ class Parser(syntax.Syntax):
                 # the expression is.
                 name = self._guess_name_of(value_expression)
 
-                if not name or name in used_names:
+                if (not name or
+                    name in used_names or
+                    (self.scope and name in self.scope)):
                     # Give up and just use the current idx for key.
                     name = "column_%d" % (idx,)
                 else:

@@ -47,9 +47,10 @@ class Query(object):
     syntax = None
     application_delegate = None
     params = None
+    scope = None
 
     def __init__(self, source, root=None, params=None, syntax=None,
-                 application_delegate=None):
+                 application_delegate=None, scope=None):
         super(Query, self).__init__()
 
         if isinstance(source, Query):
@@ -59,6 +60,7 @@ class Query(object):
             self.application_delegate = source.application_delegate
             self.syntax = source.syntax
             self.params = source.params
+            self.scope = source.scope
         elif isinstance(source, ast.Expression):
             # TODO: This will go away when other stops relying on it.
             self.root = source
@@ -74,6 +76,9 @@ class Query(object):
 
         if params is not None:
             self.params = params
+
+        if scope is not None:
+            self.scope = scope
 
         if root is not None:
             if root != self.root:
@@ -94,7 +99,8 @@ class Query(object):
                 raise ValueError(
                     "Cannot find parser for syntax %r. Source was %r." %
                     (self.syntax, self.source))
-            parser = parser_cls(original=self.source, params=self.params)
+            parser = parser_cls(original=self.source, params=self.params,
+                                scope=self.scope)
             self.root = parser.root
         elif self.root and not self.source:
             # Run formatter to generate the source.
@@ -107,10 +113,13 @@ class Query(object):
                 # If we don't have a formatter for the explicit syntax, just
                 # generate at least /something/.
                 formatter = s.Syntax.get_formatter("dottysql")
-            self.source = formatter(self.root)
+            try:
+                self.source = formatter(self.root)
+            except NotImplementedError:
+                self.source = ""
 
     def __str__(self):
-        return str(self)
+        return str(self.source)
 
     def __unicode__(self):
         return str(self.source)

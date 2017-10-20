@@ -27,7 +27,7 @@ from efilter import protocol
 
 @dispatch.multimethod
 def resolve(structured, key):
-    raise NotImplementedError()
+    return None
 
 
 def getmembers(structured):
@@ -72,6 +72,12 @@ def reflect_static_member(structured_cls, name):
 @dispatch.multimethod
 def reflect_runtime_member(structured, name):
     return reflect_static_member(type(structured), name)
+
+
+@dispatch.multimethod
+def isstructured(x):
+    """Is x structured."""
+    return isinstance(x, IStructured)
 
 
 class IStructured(protocol.Protocol):
@@ -130,7 +136,7 @@ IStructured.implement(
 IStructured.implement(
     for_type=type(None),
     implementations={
-        resolve: lambda x: None,
+        resolve: lambda item, member: None,
         getmembers_runtime: lambda x: [],
     }
 )

@@ -22,6 +22,7 @@ from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter.protocols import repeated
+from efilter.protocols import eq
 
 
 class ListRepetition(object):
@@ -29,22 +30,10 @@ class ListRepetition(object):
 
     _delegate = None
 
-    def __init__(self, first_value=None, *values):
+    def __init__(self, *values):
         self._delegate = []
 
-        if first_value is None:
-            return
-
-        self._value_type = repeated.value_type(first_value)
-        self.add_value(first_value)
-
         for value in values:
-            if repeated.value_type(value) != self.value_type():
-                raise TypeError(
-                    "All values of a repeated var must be the of same type."
-                    " First argument was of type %r, but argument %r is of"
-                    " type %r." %
-                    (self.value_type(), value, repeated.value_type(value)))
             self.add_value(value)
 
     def __iter__(self):
@@ -67,29 +56,13 @@ class ListRepetition(object):
         """
         self._delegate.append(value)
 
-    def value_type(self):
-        return self._value_type
+    def __eq__(self, other):
+        return eq.eq(self, other)
 
     def getvalues(self):
         # Return a copy because delegate is mutable and we don't want things
         # to blow up.
         return self._delegate[:]
-
-    def value_eq(self, other):
-        if isinstance(other, type(self)):
-            # pylint: disable=protected-access
-            return sorted(self._delegate) == sorted(other._delegate)
-
-        return sorted(self._delegate) == sorted(repeated.getvalues(other))
-
-    def __eq__(self, other):
-        if not isinstance(other, repeated.IRepeated):
-            return False
-
-        return self.value_eq(other)
-
-    def __ne__(self, other):
-        return not self == other
 
     def value_apply(self, f):
         return repeated.repeated(*[f(x) for x in self.getvalues()])
@@ -102,3 +75,23 @@ class ListRepetition(object):
 repeated.IRepeated.implicit_static(ListRepetition)
 repeated.repeated.implement(for_type=object.__mro__[-1],
                             implementation=ListRepetition)
+
+
+def eq_impl(self, other):
+    if not repeated.isrepeating(other):
+        return False
+
+    for x, y in zip(self, other):
+        if eq.ne(x, y):
+            return False
+
+    return True
+
+
+eq.IEq.implement(
+    for_type=ListRepetition,
+    implementations={
+        eq.eq: eq_impl,
+        eq.ne: lambda x, y: not eq_impl(x, y)
+    }
+)

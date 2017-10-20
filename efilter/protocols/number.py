@@ -50,6 +50,10 @@ def quotient(x, y):
     raise NotImplementedError()
 
 
+def isnumber(element):
+    return isinstance(element, INumber)
+
+
 class INumber(protocol.Protocol):
     _required_functions = (sum, product, difference, quotient)
 
@@ -62,6 +66,6 @@ INumber.implement(
         sum: lambda x, y: x + y,
         product: lambda x, y: x * y,
         difference: lambda x, y: x - y,
-        quotient: lambda x, y: x // y
+        quotient: lambda x, y: x / y
     }
 )

@@ -22,6 +22,8 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter.ext import lazy_repetition
 
+from efilter.protocols import applicative
+from efilter.protocols import eq
 from efilter.protocols import repeated
 
 from efilter_tests import testlib
@@ -37,23 +39,11 @@ class LazyRepetitionTest(testlib.EfilterTestCase):
 
         l = lazy_repetition.LazyRepetition(_generator)
 
-        # Get the type of the first value.
-        self.assertEqual(str, l.value_type())
-
         # But still iterate from idx 0.
         self.assertItemsEqual(l.getvalues(), ("a", "b", "c", "d"))
 
         # Second iteration should still work!
         self.assertItemsEqual(l.getvalues(), ("a", "b", "c", "d"))
-
-    def testApply(self):
-        def _generator():
-            yield 1
-            yield 2
-
-        l = lazy_repetition.LazyRepetition(_generator)
-        self.assertItemsEqual(l.value_apply(lambda x: x * 2).getvalues(),
-                              [2, 4])
 
     def testProtocol(self):
         def _generator():
@@ -69,17 +59,7 @@ class LazyRepetitionTest(testlib.EfilterTestCase):
 
         double = lazy_repetition.LazyRepetition(_generator)
         self.assertEqual(list(repeated.getvalues(double)), ["a", "b"])
-        with self.assertRaises(TypeError):
-            repeated.getvalue(double)
-
-    def testScalarCompare(self):
-        def _generator():
-            yield 1
-
-        l = lazy_repetition.LazyRepetition(_generator)
-        self.assertTrue(l.value_eq(1))
-
-        self.assertEqual(int, l.value_type())
+        self.assertEqual(repeated.getvalue(double), "a")
 
     def testCompare(self):
         def _generator():
@@ -87,5 +67,6 @@ class LazyRepetitionTest(testlib.EfilterTestCase):
             yield 2
             yield 3
 
-        self.assertEqual(lazy_repetition.LazyRepetition(_generator),
-                         repeated.meld(1, 2, 3))
+        self.assertTrue(
+            eq.eq(lazy_repetition.LazyRepetition(_generator),
+                  repeated.meld(1, 2, 3)))

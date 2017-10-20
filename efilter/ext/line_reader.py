@@ -72,12 +72,6 @@ class LazyLineReader(object):
     def value_type(self):
         return six.string_types[0]
 
-    def value_eq(self, other):
-        if isinstance(other, type(self)):
-            return self.fd == other.fd
-
-        return list(self) == list(other)
-
     def value_apply(self, f):
         for value in self:
             yield f(value)

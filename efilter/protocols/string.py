@@ -17,42 +17,39 @@
 # limitations under the License.
 
 """EFILTER abstract type system."""
+from __future__ import division
+
+from past.utils import old_div
+import six
 
 from efilter import dispatch
 from efilter import protocol
+
 
 # Declarations:
 # pylint: disable=unused-argument
 
 
 @dispatch.multimethod
-def eq(x, y):
+def string(x):
+    """Return a stringified representation."""
     raise NotImplementedError()
+
+
+class IString(protocol.Protocol):
+    _required_functions = (string,)
 
 
 @dispatch.multimethod
-def ne(x, y):
-    raise NotImplementedError()
-
-
-class IEq(protocol.Protocol):
-    _required_functions = (eq, ne)
+def isstring(x):
+    """Optional: Is x a string?"""
+    return isinstance(x, IString)
 
 
 # Default implementations:
-
-IEq.implement(
-    for_type=protocol.AnyType,
+IString.implement(
+    for_types=six.string_types,
     implementations={
-        eq: lambda x, y: x == y,
-        ne: lambda x, y: x != y
-    }
-)
-
-IEq.implement(
-    for_types=(list, tuple),
-    implementations={
-        eq: lambda x, y: sorted(x) == sorted(y),
-        ne: lambda x, y: sorted(x) != sorted(y),
+        string: lambda x: x
     }
 )

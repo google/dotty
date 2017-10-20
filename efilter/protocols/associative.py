@@ -87,6 +87,7 @@ class IAssociative(protocol.Protocol):
 IAssociative.implement(for_type=dict,
                        implementations={
                            select: lambda d, key: d[key],
+                           reflect_runtime_key: lambda x, k: x.get(k),
                            getkeys_runtime: lambda d: list(d.keys())})
 
 

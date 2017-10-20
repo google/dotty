@@ -50,10 +50,10 @@ def scope_reflect_runtime_member(scope, name):
             for x in member:
                 return type(x)
 
-        return type(member)
+        return member
 
     except KeyError:
-        return protocol.AnyType
+        return protocol.AnyType()
 
 
 # Lets us pretend that dicts are objects, which makes it easy for users to

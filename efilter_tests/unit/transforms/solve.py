@@ -26,8 +26,10 @@ from efilter import ast
 from efilter import errors
 from efilter import query as q
 
+from efilter.protocols import eq
 from efilter.protocols import reducer
 from efilter.protocols import repeated
+from efilter.protocols import structured
 
 from efilter.transforms import solve
 
@@ -73,14 +75,6 @@ class SolveTest(testlib.EfilterTestCase):
             {"x": 5, "y": 10})
 
     def testSubselects(self):
-        query = q.Query(
-            "5 + SELECT age FROM"
-            " (bind('age': 10, 'name': 'Tom'), bind('age': 8, 'name': 'Jerry'))"
-            " WHERE name == 'Jerry'")
-        self.assertEqual(
-            solve.solve(query, {}).value,
-            13)
-
         # This should fail because we're selecting two values.
         query = q.Query(
             "5 + SELECT age, name FROM"
@@ -104,57 +98,24 @@ class SolveTest(testlib.EfilterTestCase):
             repeated.meld({"age": 10, "name": "Tom"},
                           {"age": 8, "name": "Jerry"}))
 
-        # However, equivalence should blow up:
-        query = q.Query(
-            "let users = ("
-            " bind('age': 10, 'name': 'Tom'),"
-            " bind('age': 8, 'name': 'Jerry')"
-            "),"
-            "names = SELECT name FROM users"
-            " SELECT * FROM users WHERE name == names")
-
-        with self.assertRaises(errors.EfilterTypeError):
-            # Need to force the results to be realized (solve is lazy), hence
-            # the list.
-            list(solve.solve(query, {}).value)
-
-        # It also shouldn't work if the subselect returns multiple columns.
-         # However, equivalence should blow up:
-        query = q.Query(
-            "let users = ("
-            " bind('age': 10, 'name': 'Tom'),"
-            " bind('age': 8, 'name': 'Jerry')"
-            "),"
-            "names = SELECT * FROM users"
-            " SELECT * FROM users WHERE name IN names")
-
-        with self.assertRaises(errors.EfilterTypeError):
-            # Need to force the results to be realized (solve is lazy), hence
-            # the list.
-            list(solve.solve(query, {}).value)
-
     def testRepeat(self):
         query = q.Query("(1, 2, 3, 4)")
         self.assertEqual(
             solve.solve(query, {}).value,
             repeated.meld(1, 2, 3, 4))
 
-        # Repeated values flatten automatically.
+        # Repeated values do not flatten automatically.
         query = q.Query("(1, (2, 3), 4)")
         self.assertEqual(
             solve.solve(query, {}).value,
-            repeated.meld(1, 2, 3, 4))
+            repeated.meld(1, [2, 3], 4))
 
         # Expressions work.
         query = q.Query("(1, (2 + 2), 3, 4)")
         self.assertEqual(
             solve.solve(query, {}).value,
-            repeated.meld(1, 4, 3, 4))
-
-        # Repeated values are mono-types.
-        with self.assertRaises(errors.EfilterTypeError):
-            query = q.Query("(1, 'foo', 3, 4)")
-            solve.solve(query, {})
+            # Operators always return a list.
+            repeated.meld(1, [4], 3, 4))
 
         # None should be skipped.
         query = q.Query(
@@ -175,7 +136,7 @@ class SolveTest(testlib.EfilterTestCase):
         query = q.Query("[x + 5, 1 == 1, y['foo']]")
         self.assertEqual(
             solve.solve(query, {"x": 2, "y": {"foo": "bar"}}).value,
-            (7, True, "bar"))
+            ([7], True, "bar"))
 
     def testIfElse(self):
         query = q.Query(("if", True, "foo", "bar"))
@@ -228,7 +189,7 @@ class SolveTest(testlib.EfilterTestCase):
                         ast.Var("x"),
                         ast.Var("x"))),
                 {}).value,
-            10)
+            [10])
 
         # Previous binding should be made available to subsequent bindings.
         self.assertEqual(
@@ -245,7 +206,7 @@ class SolveTest(testlib.EfilterTestCase):
                                 ast.Literal(5)))),
                     ast.Var("y")),
                 {}).value,
-            10)
+            [10])
 
     def testSelect(self):
         self.assertEqual(
@@ -354,13 +315,13 @@ class SolveTest(testlib.EfilterTestCase):
         )
 
     def testFilter(self):
-        self.assertValuesEqual(
-            solve.solve(
-                q.Query("select * from Process where (pid == 1)"),
-                {"Process": repeated.meld(
-                    mocks.Process(2, None, None),
-                    mocks.Process(1, None, None))}).value,
-            mocks.Process(1, None, None))
+        value = solve.solve(
+            q.Query("select * from Process where (pid == 1)"),
+            {"Process": repeated.meld(
+                mocks.Process(2, None, None),
+                mocks.Process(1, None, None))}).value
+
+        self.assertValuesEqual(value, [mocks.Process(1, None, None)])
 
     def testReducer(self):
         # This should return a reducer that computes the mean of the age
@@ -417,21 +378,6 @@ class SolveTest(testlib.EfilterTestCase):
 
         self.assertItemsEqual(expected, actual)
 
-    def testIsInstance(self):
-        with self.assertRaises(
-                errors.EfilterTypeError,
-                error_f=lambda e: "Cannot find type named 'FooBar'" in str(e)):
-            solve.solve(q.Query("proc isa FooBar"), mocks.MockRootType())
-
-        self.assertTrue(solve.solve(q.Query("proc isa Process"),
-                                    mocks.MockRootType()).value)
-
-        # Builtin types should work, too.
-        self.assertTrue(solve.solve(q.Query("5 isa int"), {}).value)
-
-        # Always never forget to test for negatives.
-        self.assertFalse(solve.solve(q.Query("5 isa str"), {}).value)
-
     def testCast(self):
         self.assertEqual(
             solve.solve(
@@ -452,35 +398,102 @@ class SolveTest(testlib.EfilterTestCase):
                                     mocks.Process(1, None, None)).value)
 
     def testSum(self):
+        # Adding a constant to a list, adds it to each element.
+        query = q.Query(
+            "SELECT ages + 10 as sum FROM (bind('ages': [10, 20, 30]))")
+
+        value = list(solve.solve(query, {}).value)
+        sum = structured.resolve(value[0], "sum")
+        self.assertEqual(sum, [20, 30, 40])
+
+        # Adding a list to a list, pads the short list with zeros.
+        query = q.Query(
+            "SELECT ages + [10, 20] as sum FROM (bind('ages': [10, 20, 30]))")
+
+        value = list(solve.solve(query, {}).value)
+        sum = structured.resolve(value[0], "sum")
+        self.assertEqual(sum, [20, 40, 30])
+
+        # Repeated integers add item by item to the
+        query = q.Query(
+            "[5, 1, 2] + 10 + SELECT age FROM"
+            " (bind('age': 10, 'name': 'Tom'), bind('age': 8, 'name': 'Jerry'))"
+            " WHERE name == 'Jerry'")
+        self.assertEqual(
+            solve.solve(query, {}).value,
+            [23, 11, 12])
+
         self.assertEqual(
             solve.solve(
-                q.Query("pid + 10 + 20"),
+                q.Query("5 + 15 + 25"),
                 mocks.Process(1, None, None)).value,
-            31)
+            [45])
 
     def testDifference(self):
-        self.assertEqual(
-            solve.solve(
-                q.Query("(10 - pid) + 5"),
-                mocks.Process(1, None, None)).value,
-            14)
+        # Adding a constant to a list, adds it to each element.
+        query = q.Query(
+            "SELECT ages - 10 as diff FROM (bind('ages': [10, 20, 30]))")
+
+        value = list(solve.solve(query, {}).value)
+        diff = structured.resolve(value[0], "diff")
+        self.assertEqual(diff, [0, 10, 20])
+
+        # Subtracting numbers from non numbers just gives None.
+        query = q.Query(
+            'SELECT ages - 10 as diff FROM (bind("ages": ["foo", "bar", "baz"]))')
+
+        value = list(solve.solve(query, {}).value)
+        diff = structured.resolve(value[0], "diff")
+        self.assertEqual(diff, [None, None, None])
 
     def testProduct(self):
+        # Multiplying a constant to a list, adds it to each element.
+        query = q.Query(
+            "SELECT ages * 10 as x FROM (bind('ages': [10, 20, 30]))")
+
+        value = list(solve.solve(query, {}).value)
+        x = structured.resolve(value[0], "x")
+        self.assertEqual(x, [100, 200, 300])
+
+        # Multiplying a constant to a list, multiply each element.
+        query = q.Query(
+            "10 * (SELECT age FROM (bind('age': 10), bind('age': 20)))")
+
+        value = list(solve.solve(query, {}).value)
+        self.assertEqual(value, [100, 200])
+
+        # Multiplying two subselects multiplies each element.
+        query = q.Query(
+            """(SELECT age FROM (bind('age': 10), bind('age': 20))) *
+               (SELECT age FROM (bind('age': 20), bind('age': 30)))
+            """)
+
+        value = list(solve.solve(query, {}).value)
+        self.assertEqual(value, [200, 600])
+
         self.assertEqual(
             solve.solve(
                 q.Query("5 * 5 * 5"),
                 mocks.Process(1, None, None)).value,
-            125)
+            [125])
 
     def testQuotient(self):
         self.assertEqual(
             solve.solve(
                 q.Query("10.0 / 4"),
                 mocks.Process(1, None, None)).value,
-            2.5)
+            [2.5])
 
     def testEquivalence(self):
         self.assertTrue(solve.solve(q.Query("pid == 1"),
+                                    mocks.Process(1, None, None)).value)
+
+        # repeated elements are expanded in the usual way.
+        self.assertTrue(solve.solve(q.Query("[1] == 1"),
+                                    mocks.Process(1, None, None)).value)
+
+        # Same as [1,2] == [1, None]
+        self.assertFalse(solve.solve(q.Query("[1, 2] == [1]"),
                                     mocks.Process(1, None, None)).value)
 
     def testMembership(self):
@@ -507,11 +520,11 @@ class SolveTest(testlib.EfilterTestCase):
         # This should behave as expected - a singleton string is distinct from a
         # string if in a list, but not in a repeated value.
         self.assertTrue(
-            solve.solve(q.Query("'foo' not in ['foobar']"), {}).value)
+            solve.solve(q.Query("'foo' in ['foobar']"), {}).value)
 
         # All this should be true for vars as well as literals:
         self.assertTrue(
-            solve.solve(q.Query("'foo' not in [x]"), {"x": "foobar"}).value)
+            solve.solve(q.Query("'foo' in [x]"), {"x": "foobar"}).value)
         self.assertTrue(
             solve.solve(q.Query("'foo' in x"), {"x": "foobar"}).value)
         self.assertTrue(
@@ -530,14 +543,13 @@ class SolveTest(testlib.EfilterTestCase):
             solve.solve(q.Query("'foo' in x"),
                         {"x": repeated.meld("foo", "bar")}).value)
         self.assertTrue(
-            solve.solve(q.Query("'foo' not in x"),
+            solve.solve(q.Query("'foo' in x"),
                         {"x": repeated.meld("foobar", "bar")}).value)
 
-        # This is where it gets tricky: a repeated value of a single value is
-        # equal to the single value - this is how EFILTER is supposed to work.
-        # In this case it may be unexpected, but them's the breaks.
+        # Membership operator on a repeated string is equivalent to
+        # the substring of each member.
         self.assertTrue(
-            solve.solve(q.Query("'foo' not in ('foobar', 'bar')"), {}).value)
+            solve.solve(q.Query("'foo' in ('foobar', 'bar')"), {}).value)
         self.assertTrue(solve.solve(q.Query("'foo' in ('foobar')"), {}).value)
 
         # Single characters should behave correctly.

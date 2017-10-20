@@ -116,18 +116,7 @@ class MockRootType(object):
         return self.DATA[name]
 
     @classmethod
-    def reflect_static_member(cls, name):
-        var = cls.DATA.get(name)
-        if var:
-            return repeated.value_type(var)
-
-    def reflect_runtime_member(self, name):
-        var = self.DATA.get(name)
-        if var:
-            return repeated.value_type(var)
-
-    @classmethod
-    def getmembers_static(cls):
+    def getmembers(cls):
         return list(cls.DATA.keys())
 
 

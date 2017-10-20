@@ -219,13 +219,6 @@ class Resolve(BinaryExpression):
         return self.rhs
 
 
-class IsInstance(BinaryExpression):
-    """Evaluates to True if the current scope is an instance of type."""
-
-    type_signature = (protocol.AnyType, type)
-    return_signature = bool
-
-
 class Cast(BinaryExpression):
     """Represents a typecast."""
 

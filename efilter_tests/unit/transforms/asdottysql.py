@@ -139,15 +139,6 @@ class AsDottySQLTest(testlib.EfilterTestCase):
         self.assertEqual(asdottysql.asdottysql(q),
                          "<Subexpression cannot be formatted as DottySQL.>")
 
-    def testIsInstance(self):
-        self.assertOutput(
-            original="x isa t",
-            output="x isa t")
-
-        self.assertOutput(
-            original="(x and y) isa bool",
-            output="(x and y) isa bool")
-
     def testRegexFilter(self):
         self.assertOutput("x =~ '.?'", "x =~ '.?'")
 

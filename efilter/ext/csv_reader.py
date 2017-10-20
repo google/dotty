@@ -59,12 +59,6 @@ class LazyCSVReader(object):
     def value_type(self):
         return dict if self.output_dicts else list
 
-    def value_eq(self, other):
-        if isinstance(other, type(self)):
-            return self.source.fd == other.source.fd
-
-        return list(self) == list(other)
-
     def value_apply(self, f):
         for value in self:
             yield f(value)

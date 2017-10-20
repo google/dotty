@@ -395,13 +395,6 @@ class ParserTest(testlib.EfilterTestCase):
                        ast.Literal(2),
                        ast.Literal(3)))
 
-    def testIsInstance(self):
-        self.assertQueryMatches(
-            "5 isa int",
-            ast.IsInstance(
-                ast.Literal(5),
-                ast.Var("int")))
-
     def testCast(self):
         self.assertQueryMatches(
             "cast(5, int)",

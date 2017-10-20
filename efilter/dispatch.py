@@ -186,7 +186,7 @@ class multimethod(object):
         return self.func.__name__
 
     def __repr__(self):
-        return "multimethod(%s)" % self.__class__.__name__
+        return "multimethod(%s)" % self.func_name
 
     def __call__(self, *args, **kwargs):
         """Pick the appropriate overload based on args and call it."""
@@ -212,7 +212,7 @@ class multimethod(object):
             raise NotImplementedError(
                 "Multimethod %r is not implemented for type %r and has no "
                 "default behavior. Overloads are defined for %r."
-                % (self.__class__.__name__, dispatch_type, implemented_types))
+                % (self.func_name, dispatch_type, implemented_types))
 
     def implemented_for_type(self, dispatch_type):
         candidate = self._find_and_cache_best_function(dispatch_type)
