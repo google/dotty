@@ -114,45 +114,6 @@ def __solve_for_repeated(expr, vars):
     return var, repeated.isrepeating(var)
 
 
-def __solve_for_scalar(expr, vars):
-    """Helper: solve 'expr' always returning a scalar (not IRepeated).
-
-    If the output of 'expr' is a single value or a single RowTuple with a single
-    column then return the value in that column. Otherwise raise.
-
-    Arguments:
-        expr: Expression to solve.
-        vars: The scope.
-
-    Returns:
-        A scalar value (not an IRepeated).
-
-    Raises:
-        EfilterTypeError if it cannot get a scalar.
-    """
-    var = solve(expr, vars).value
-    return var
-
-    try:
-        scalar = repeated.getvalue(var)
-    except TypeError:
-        raise errors.EfilterTypeError(
-            root=expr, query=expr.source,
-            message="Wasn't expecting more than one value here. Got %r."
-            % (var,))
-
-    if isinstance(scalar, row_tuple.RowTuple):
-        try:
-            return scalar.get_singleton()
-        except ValueError:
-            raise errors.EfilterTypeError(
-                root=expr, query=expr.source,
-                message="Was expecting a scalar value here. Got %r."
-                % (scalar,))
-    else:
-        return scalar
-
-
 def __solve_and_destructure_repeated(expr, vars):
     """Helper: solve 'expr' always returning a list of scalars.
 
@@ -222,7 +183,6 @@ def solve_query(query, vars):
     # Standard library must always be included. Others are optional, and the
     # caller can add them to vars using ScopeStack.
     vars = scope.ScopeStack(std_core.MODULE, vars)
-
     try:
         return solve(query.root, vars)
     except errors.EfilterError as error:
@@ -343,7 +303,7 @@ def solve_apply(expr, vars):
     a whitelist. EFILTER will never directly call a function that wasn't
     provided through a protocol implementation.
     """
-    func = __solve_for_scalar(expr.func, vars)
+    func = solve(expr.func, vars).value
     args, kwargs = parse_apply_args(expr.args, vars)
     result = applicative.apply(func, args, kwargs)
 
@@ -717,7 +677,7 @@ def convert_to_iterators(expr, vars, pad=0):
     iterators = []
     # Expand each child into a list.
     for child in expr.children:
-        val = __solve_for_scalar(child, vars)
+        val = solve(child, vars).value
         if repeated.isrepeating(val) and not number.isnumber(val):
             val = convert_to_list(expr, val)
             if len(val) > max_length:
@@ -849,15 +809,6 @@ def solve_equivalence(expr, vars):
 
 @solve.implementation(for_type=ast.Membership)
 def solve_membership(expr, vars):
-    # There is an expectation that "foo" in "foobar" will be true, and,
-    # simultaneously, that "foo" in ["foobar"] will be false. This is how the
-    # analogous operator works in Python, among other languages. Where this
-    # mental model breaks down is around repeated values, because, in EFILTER,
-    # there is no difference between a tuple of one value and the one value,
-    # so that "foo" in ("foobar") is true, while "foo" in ("foobar", "bar") is
-    # false and "foo" in ("foo", "bar") is again true. These semantics are a
-    # little unfortunate, and it may be that, in the future, the in operator
-    # is disallowed on repeated values to prevent ambiguity.
     needle = solve(expr.element, vars).value
     haystack, isrepeating = __solve_and_destructure_repeated(expr.set, vars)
     if repeated.isrepeating(needle) and repeated.isrepeating(haystack):
@@ -885,8 +836,8 @@ def solve_regexfilter(expr, vars):
 
     If any item in the array matches, we return the entire row.
     """
-    pattern = re.compile(__solve_for_scalar(expr.regex, vars), re.I)
-    string = __solve_for_scalar(expr.string, vars)
+    pattern = re.compile(solve(expr.regex, vars).value, re.I)
+    string = solve(expr.string, vars).value
     if repeated.isrepeating(string):
         for item in string:
             match = pattern.search(six.text_type(str(item)))
@@ -901,41 +852,51 @@ def solve_regexfilter(expr, vars):
     return Result(False, ())
 
 
+def _is_monotonic(elements, inc=True):
+    """Is the sequence in elements monotonically increasing?"""
+    last = None
+    for i, element in enumerate(elements):
+        if i == 0:
+            last = element
+
+        elif number.isnumber(element):
+            if inc:
+                if last < element:
+                    return False
+            else:
+                if last < element:
+                    return False
+        elif ordered.isordered(element):
+            if inc:
+                if ordered.lt(last, element):
+                    return False
+            else:
+                if ordered.lt(element, last):
+                    return False
+
+    return True
+
 @solve.implementation(for_type=ast.StrictOrderedSet)
 def solve_strictorderedset(expr, vars):
-    iterator = iter(expr.children)
-    min_ = __solve_for_scalar(next(iterator), vars)
+    iterators = convert_to_iterators(expr, vars, pad=0)
+    # Add each element individually.
+    result = []
+    for elements in zip(*iterators):
+        result.append(_is_monotonic(elements))
 
-    if min_ is None:
-        return Result(False, ())
-
-    for child in iterator:
-        val = __solve_for_scalar(child, vars)
-
-        try:
-            if not min_ > val or val is None:
-                return Result(False, ())
-        except TypeError:
-            raise errors.EfilterTypeError(expected=type(min_),
-                                          actual=type(val),
-                                          root=child,
-                                          query=expr.source,)
-
-        min_ = val
-
-    return Result(True, ())
+    return Result(result, ())
 
 
 @solve.implementation(for_type=ast.PartialOrderedSet)
 def solve_partialorderedset(expr, vars):
     iterator = iter(expr.children)
-    min_ = __solve_for_scalar(next(iterator), vars)
+    min_ = solve(next(iterator), vars).value
 
     if min_ is None:
         return Result(False, ())
 
     for child in iterator:
-        val = __solve_for_scalar(child, vars)
+        val = solve(child, vars).value
 
         try:
             if min_ < val or val is None:

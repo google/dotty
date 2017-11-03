@@ -87,6 +87,7 @@ class Parser(syntax.Syntax):
     def __init__(self, original, params=None, scope=None):
         super(Parser, self).__init__(original)
         self.scope = scope
+        self.aliases = []
 
         self.tokens = token_stream.TokenStream(
             tokenizer.LazyTokenizer(self.original))
@@ -221,6 +222,10 @@ class Parser(syntax.Syntax):
                         end=self.tokens.matched.first.end))
 
         if self.tokens.accept(common_grammar.symbol):
+            name = self.tokens.matched.value
+            if name in self.aliases[-1]:
+                return self.aliases[-1][name]
+
             return ast.Var(self.tokens.matched.value, source=self.original,
                            start=self.tokens.matched.start,
                            end=self.tokens.matched.end)
@@ -392,16 +397,21 @@ class Parser(syntax.Syntax):
 
     def select(self):
         """First part of an SQL query."""
-        # Try to match the asterisk, any or list of vars.
-        if self.tokens.accept(grammar.select_any):
-            return self.select_any()
+        self.aliases.append({})
 
-        if self.tokens.accept(grammar.select_all):
-            # The FROM after SELECT * is required.
-            self.tokens.expect(grammar.select_from)
-            return self.select_from()
+        try:
+            # Try to match the asterisk, any or list of vars.
+            if self.tokens.accept(grammar.select_any):
+                return self.select_any()
 
-        return self.select_what()
+            if self.tokens.accept(grammar.select_all):
+                # The FROM after SELECT * is required.
+                self.tokens.expect(grammar.select_from)
+                return self.select_from()
+
+            return self.select_what()
+        finally:
+            self.aliases.pop(-1)
 
     def select_any(self):
         saved_match = self.tokens.matched
@@ -480,6 +490,10 @@ class Parser(syntax.Syntax):
                                              start=self.tokens.matched.start,
                                              end=self.tokens.matched.end,
                                              source=self.original)
+
+                # Record the value expression of the alias.
+                self.aliases[-1][self.tokens.matched.value] = value_expression
+
                 used_names.add(self.tokens.matched.value)
             else:
                 # Try to guess the appropriate name of the column based on what

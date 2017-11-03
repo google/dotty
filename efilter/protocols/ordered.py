@@ -22,6 +22,8 @@ import six
 
 from efilter import dispatch
 from efilter import protocol
+from efilter.protocols import eq
+
 
 # Declarations:
 # pylint: disable=unused-argument
@@ -43,8 +45,22 @@ def assortkey(x):
     raise NotImplementedError()
 
 
+@dispatch.multimethod
+def lt(lhs, rhs):
+    raise NotImplementedError()
+
+
+@dispatch.multimethod
+def gt(lhs, rhs):
+    raise NotImplementedError()
+
+
 class IOrdered(protocol.Protocol):
     _required_functions = (assortkey,)
+
+
+def isordered(element):
+    return isinstance(element, IOrdered)
 
 
 # Default implementations:
