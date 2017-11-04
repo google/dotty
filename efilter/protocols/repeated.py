@@ -142,15 +142,6 @@ counted.ICounted.implement(
 )
 
 
-# Repeated values should sort as a tuple of themselves.
-ordered.IOrdered.implement(
-    for_type=IRepeated,
-    implementations={
-        ordered.assortkey: getvalues
-    }
-)
-
-
 # Implementation for scalars:
 # pylint: disable=unnecessary-lambda
 IRepeated.implement(

@@ -344,7 +344,6 @@ class Parser(syntax.Syntax):
         operators. A mixfix operator in DottySQL consists of an infix part
         and a suffix (they are still binary, they just have a terminator).
         """
-
         # Spin as long as the next token is an operator of higher
         # precedence. (This may not do anything, which is fine.)
         while self.accept_operator(precedence=min_precedence):

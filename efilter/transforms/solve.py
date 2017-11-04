@@ -26,6 +26,7 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 # pylint: disable=function-redefined
 
 import collections
+import functools
 import re
 import six
 
@@ -423,8 +424,19 @@ def solve_filter(expr, vars):
 
     def lazy_filter():
         for lhs_value in repeated.getvalues(lhs_values):
-            if solve(expr.rhs, __nest_scope(expr.lhs, vars, lhs_value)).value:
-                yield lhs_value
+            filter_result = solve(expr.rhs, __nest_scope(
+                expr.lhs, vars, lhs_value)).value
+            # Repeating values are chosen if any of the values returns
+            # true.
+            if repeated.isrepeating(filter_result):
+                if any(filter_result):
+                    yield lhs_value
+
+            else:
+                # Todo: Implement a bool protocol - for now we use the
+                # python bool.  Scalar values must evaluate to true.
+                if bool(filter_result):
+                    yield lhs_value
 
     return Result(repeated.lazy(lazy_filter), ())
 
@@ -478,19 +490,34 @@ def solve_group(expr, vars):
     return Result(repeated.meld(*results), ())
 
 
+def _cmp(x, y):
+    if eq.eq(x, y) or eq.eq(y, x):
+        return 0
+
+    if _lt(x, y):
+        return -1
+
+    return 1
+
+
 @solve.implementation(for_type=ast.Sort)
 def solve_sort(expr, vars):
     """Sort values on the LHS by the value they yield when passed to RHS."""
-    lhs_values = repeated.getvalues(__solve_for_repeated(expr.lhs, vars)[0])
+    lhs_values = repeated.getvalues(solve(expr.lhs, vars)[0])
 
     sort_expression = expr.rhs
 
     def _key_func(x):
         return solve(sort_expression, __nest_scope(expr.lhs, vars, x)).value
 
-    results = ordered.ordered(lhs_values, key_func=_key_func)
+    # In order to sort we must expand the list into memory and apply
+    # the sort expression to each element. We then use the ordered and
+    # eq protocols to compare any two items until the list is sorted.
+    sorted_list = [(x, _key_func(x)) for x in lhs_values]
+    key_func = functools.cmp_to_key(_cmp)
+    sorted_list.sort(key=lambda x: key_func(x[1]))
 
-    return Result(repeated.meld(*results), ())
+    return Result([x[0] for x in sorted_list], ())
 
 
 @solve.implementation(for_type=ast.Each)
@@ -570,14 +597,14 @@ def solve_complement(expr, vars):
 
 @solve.implementation(for_type=ast.Intersection)
 def solve_intersection(expr, vars):
-    result = Result(False, ())
     for child in expr.children:
-        result = solve(child, vars)
-        if not result.value:
-            # Intersections don't preserve the last value the way Unions do.
-            return result._replace(value=False)
+        result = solve(child, vars).value
+        if repeated.isrepeating(result) and not any(result):
+            return Result(False, ())
+        elif not result:
+            return Result(False, ())
 
-    return result
+    return Result(True, ())
 
 
 @solve.implementation(for_type=ast.Union)
@@ -852,27 +879,40 @@ def solve_regexfilter(expr, vars):
     return Result(False, ())
 
 
-def _is_monotonic(elements, inc=True):
-    """Is the sequence in elements monotonically increasing?"""
+def _lt(x, y):
+    if ordered.isordered(x):
+        return ordered.lt(x, y)
+    elif ordered.isordered(y):
+        return not ordered.lt(y, x)
+
+    # Non orderable filter should return False.
+    return False
+
+
+def _is_monotonic(elements, inc=True, strict=False):
+    """Is the sequence in elements monotonically increasing?
+
+    Args: inc: Direction of monotonicity (increasing or decreasing).
+          strict: If true elements may not repeat.
+    """
     last = None
     for i, element in enumerate(elements):
         if i == 0:
             last = element
+            continue
 
-        elif number.isnumber(element):
-            if inc:
-                if last < element:
-                    return False
-            else:
-                if last < element:
-                    return False
-        elif ordered.isordered(element):
-            if inc:
-                if ordered.lt(last, element):
-                    return False
-            else:
-                if ordered.lt(element, last):
-                    return False
+        # Strict monotonic means this element can not be equal to
+        # the last one.
+        if eq.eq(element, last):
+            if strict:
+                return False
+            continue
+
+        if inc and _lt(element, last):
+            return False
+
+        if not inc and _lt(last, element):
+            return False
 
     return True
 
@@ -882,31 +922,17 @@ def solve_strictorderedset(expr, vars):
     # Add each element individually.
     result = []
     for elements in zip(*iterators):
-        result.append(_is_monotonic(elements))
+        result.append(_is_monotonic(elements, strict=True))
 
     return Result(result, ())
 
 
 @solve.implementation(for_type=ast.PartialOrderedSet)
 def solve_partialorderedset(expr, vars):
-    iterator = iter(expr.children)
-    min_ = solve(next(iterator), vars).value
+    iterators = convert_to_iterators(expr, vars, pad=0)
+    # Add each element individually.
+    result = []
+    for elements in zip(*iterators):
+        result.append(_is_monotonic(elements, strict=False))
 
-    if min_ is None:
-        return Result(False, ())
-
-    for child in iterator:
-        val = solve(child, vars).value
-
-        try:
-            if min_ < val or val is None:
-                return Result(False, ())
-        except TypeError:
-            raise errors.EfilterTypeError(expected=type(min_),
-                                          actual=type(val),
-                                          root=child,
-                                          query=expr.source)
-
-        min_ = val
-
-    return Result(True, ())
+    return Result(result, ())
