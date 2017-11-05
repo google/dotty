@@ -22,7 +22,9 @@ import six
 
 from efilter import dispatch
 from efilter import protocol
-from efilter.protocols import eq
+
+if six.PY3:
+    long = int
 
 
 # Declarations:
@@ -46,5 +48,12 @@ IOrdered.implement(
     for_type=type(None),
     implementations={
         lt: lambda x, y: False
+    }
+)
+
+IOrdered.implement(
+    for_types=(int, long, float,),
+    implementations={
+        lt: lambda x, y: x < y
     }
 )

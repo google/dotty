@@ -42,4 +42,3 @@ rm -rf efilter.egg-info/ .cache/
 rm -rf .tox
 find . -iname "*.pyc" -delete
 find . -iname __pycache__ -delete
-

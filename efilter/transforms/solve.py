@@ -19,7 +19,6 @@ EFILTER individual object filter and matcher.
 """
 
 from builtins import next
-from builtins import str
 from builtins import zip
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
@@ -42,7 +41,6 @@ from efilter.ext import row_tuple
 from efilter.protocols import applicative
 from efilter.protocols import associative
 from efilter.protocols import boolean
-from efilter.protocols import counted
 from efilter.protocols import eq
 from efilter.protocols import number
 from efilter.protocols import ordered
@@ -57,6 +55,7 @@ Result = collections.namedtuple("Result", ["value", "branch"])
 
 if six.PY3:
     unicode = str
+
 
 @dispatch.multimethod
 def solve(query, vars):
@@ -86,83 +85,6 @@ def solve(query, vars):
     """
     _ = query, vars
     raise NotImplementedError()
-
-
-def __solve_for_repeated(expr, vars):
-    """Helper: solve 'expr' always returning an IRepeated.
-
-    If the result of solving 'expr' is a list or a tuple of IStructured objects
-    then treat is as a repeated value of IStructured objects because that's
-    what the caller meant to do. This is a convenience helper so users of the
-    API don't have to create IRepeated objects.
-
-    If the result of solving 'expr' is a scalar then return it as a repeated
-    value of one element.
-
-    Arguments:
-        expr: Expression to solve.
-        vars: The scope.
-
-    Returns:
-        IRepeated result of solving 'expr'.
-        A booelan to indicate whether the original was repeating.
-    """
-    var = solve(expr, vars).value
-    if (var and isinstance(var, (tuple, list))
-            and protocol.implements(var[0], structured.IStructured)):
-        return repeated.meld(*var), False
-
-    return var, repeated.isrepeating(var)
-
-
-def __solve_and_destructure_repeated(expr, vars):
-    """Helper: solve 'expr' always returning a list of scalars.
-
-    If the output of 'expr' is one or more row tuples with only a single column
-    then return a repeated value of values in that column. If there are more
-    than one column per row then raise.
-
-    This returns a list because there's no point in wrapping the scalars in
-    a repeated value for use internal to the implementing solver.
-
-    Returns:
-        Two values:
-         - An iterator (not an IRepeated!) of scalars.
-         - A boolean to indicate whether the original value was repeating.
-
-    Raises:
-        EfilterTypeError if the values don't conform.
-    """
-    iterable, isrepeating = __solve_for_repeated(expr, vars)
-    if iterable is None:
-        return (), isrepeating
-
-    if not isrepeating:
-        return [iterable], False
-
-    values = iter(iterable)
-
-    try:
-        value = next(values)
-    except StopIteration:
-        return (), True
-
-    if not isinstance(value, row_tuple.RowTuple):
-        result = [value]
-        # We skip type checking the remaining values because it'd be slow.
-        result.extend(values)
-        return result, True
-
-    try:
-        result = [value.get_singleton()]
-        for value in values:
-            result.append(value.get_singleton())
-
-        return result, True
-    except ValueError:
-        raise errors.EfilterTypeError(
-            root=expr, query=expr.source,
-            message="Was expecting exactly one column in %r." % (value,))
 
 
 def __nest_scope(expr, outer, inner):
@@ -233,7 +155,7 @@ def solve_select(expr, vars):
     selecting from a repeated value implies a map-like operation and returns a
     new repeated value.
     """
-    data, _ = __solve_for_repeated(expr.lhs, vars)
+    data = solve(expr.lhs, vars).value
     key = solve(expr.rhs, vars).value
 
     try:
@@ -278,7 +200,7 @@ def solve_resolve(expr, vars):
     return Result(structured.resolve(objs, member), ())
 
 
-def parse_apply_args(args_ast, scope):
+def parse_apply_args(args_ast, scope_):
     args = []
     kwargs = {}
     for arg in args_ast:
@@ -288,9 +210,9 @@ def parse_apply_args(args_ast, scope):
                     root=arg.lhs,
                     message="Invalid argument name.")
 
-            kwargs[arg.key.value] = solve(arg.value, scope).value
+            kwargs[arg.key.value] = solve(arg.value, scope_).value
         else:
-            args.append(solve(arg, scope).value)
+            args.append(solve(arg, scope_).value)
 
     return args, kwargs
 
@@ -387,7 +309,7 @@ def solve_map(expr, vars):
     evaluate to {"name": "Bob"}, which subdict will then be used on the RHS as
     new vars, and that whole form will evaluate to "Bob".
     """
-    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
+    lhs_values = solve(expr.lhs, vars).value
 
     def lazy_map():
         try:
@@ -420,7 +342,7 @@ def solve_filter(expr, vars):
 
     Returns any LHS values for which RHS evaluates to a true value.
     """
-    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
+    lhs_values = solve(expr.lhs, vars).value
 
     def lazy_filter():
         for lhs_value in repeated.getvalues(lhs_values):
@@ -455,7 +377,7 @@ def solve_reducer(expr, vars):
 
 @solve.implementation(for_type=ast.Group)
 def solve_group(expr, vars):
-    rows, _ = __solve_for_repeated(expr.lhs, vars)
+    rows = solve(expr.lhs, vars).value
     reducers = [solve(child, vars).value for child in expr.reducers]
     r = reducer.Compose(*reducers)
     intermediates = {}
@@ -504,7 +426,6 @@ def _cmp(x, y):
 def solve_sort(expr, vars):
     """Sort values on the LHS by the value they yield when passed to RHS."""
     lhs_values = repeated.getvalues(solve(expr.lhs, vars)[0])
-
     sort_expression = expr.rhs
 
     def _key_func(x):
@@ -530,7 +451,7 @@ def solve_each(expr, vars):
     IAssociative objects then RHS will be evaluated with each state and True
     will be returned only if each result is true.
     """
-    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
+    lhs_values = solve(expr.lhs, vars).value
 
     for lhs_value in repeated.getvalues(lhs_values):
         result = solve(expr.rhs, __nest_scope(expr.lhs, vars, lhs_value))
@@ -544,7 +465,7 @@ def solve_each(expr, vars):
 @solve.implementation(for_type=ast.Any)
 def solve_any(expr, vars):
     """Same as Each, except returning True on first true result at LHS."""
-    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
+    lhs_values = solve(expr.lhs, vars).value
 
     try:
         rhs = expr.rhs
@@ -674,6 +595,9 @@ def solve_sum(expr, vars):
 
 
 def convert_to_list(expr, repeated_list):
+    if not repeated.isrepeating(repeated_list):
+        return [repeated_list]
+
     result = []
     for element in repeated_list:
         if element is not None:
@@ -691,6 +615,7 @@ def convert_to_list(expr, repeated_list):
 
                 element = structured.resolve(element, members[0])
             result.append(element)
+
     return result
 
 
@@ -717,11 +642,14 @@ def convert_to_iterators(expr, vars, pad=0):
         iterators.append(val)
 
     # Pad all iterator lists to be the same length.
-    for i in range(len(iterators)):
-        if not isinstance(iterators[i], list):
-            iterators[i] = [iterators[i]] * max_length
-        elif len(iterators[i]) < max_length:
-            iterators[i].extend([0] * (max_length-len(iterators[i])))
+    for i, item in enumerate(iterators):
+        # Repeat scalar values.
+        if not isinstance(item, list):
+            iterators[i] = [item] * max_length
+
+        # Extend short lists to the required length
+        elif len(item) < max_length:
+            item.extend([pad] * (max_length - len(item)))
 
     return iterators
 
@@ -820,7 +748,6 @@ def solve_equivalence(expr, vars):
     iterators = convert_to_iterators(expr, vars, pad=0)
 
     # Add each element individually.
-    result = []
     for elements in zip(*iterators):
         elements = iter(elements)
         try:
@@ -837,22 +764,17 @@ def solve_equivalence(expr, vars):
 @solve.implementation(for_type=ast.Membership)
 def solve_membership(expr, vars):
     needle = solve(expr.element, vars).value
-    haystack, isrepeating = __solve_and_destructure_repeated(expr.set, vars)
-    if repeated.isrepeating(needle) and repeated.isrepeating(haystack):
-        for needle_item in needle:
-            for haystack_item in haystack:
-                if haystack_item == needle_item:
-                    return Result(True, ())
-    else:
-        for haystack_item in haystack:
-            # Using in as a substring (This is not so useful, Should
-            # we just make users use a regex?)
-            if string.isstring(haystack_item):
-                if unicode(needle) in string.string(haystack_item):
-                    return Result(True, ())
+    haystack = convert_to_list(expr.set, solve(expr.set, vars).value)
 
-            elif haystack_item == needle:
+    for haystack_item in haystack:
+        # Using in as a substring (This is not so useful, Should
+        # we just make users use a regex?)
+        if string.isstring(haystack_item):
+            if unicode(needle) in string.string(haystack_item):
                 return Result(True, ())
+
+        elif haystack_item == needle:
+            return Result(True, ())
 
     return Result(False, ())
 
@@ -864,15 +786,15 @@ def solve_regexfilter(expr, vars):
     If any item in the array matches, we return the entire row.
     """
     pattern = re.compile(solve(expr.regex, vars).value, re.I)
-    string = solve(expr.string, vars).value
-    if repeated.isrepeating(string):
-        for item in string:
+    string_ = solve(expr.string, vars).value
+    if repeated.isrepeating(string_):
+        for item in string_:
             match = pattern.search(six.text_type(str(item)))
             if match:
                 return Result(match, ())
 
     else:
-        match = pattern.search(six.text_type(str(string)))
+        match = pattern.search(six.text_type(str(string_)))
         if match:
             return Result(match, ())
 
@@ -915,6 +837,7 @@ def _is_monotonic(elements, inc=True, strict=False):
             return False
 
     return True
+
 
 @solve.implementation(for_type=ast.StrictOrderedSet)
 def solve_strictorderedset(expr, vars):

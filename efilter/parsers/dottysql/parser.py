@@ -223,7 +223,7 @@ class Parser(syntax.Syntax):
 
         if self.tokens.accept(common_grammar.symbol):
             name = self.tokens.matched.value
-            if name in self.aliases[-1]:
+            if self.aliases and name in self.aliases[-1]:
                 return self.aliases[-1][name]
 
             return ast.Var(self.tokens.matched.value, source=self.original,
@@ -247,9 +247,9 @@ class Parser(syntax.Syntax):
 
             if len(expressions) == 1:
                 return expressions[0]
-            else:
-                return ast.Repeat(*expressions, source=self.original,
-                                  start=start, end=self.tokens.matched.end)
+
+            return ast.Repeat(*expressions, source=self.original,
+                              start=start, end=self.tokens.matched.end)
 
         if self.tokens.accept(common_grammar.lbracket):
             return self.list()
@@ -261,8 +261,8 @@ class Parser(syntax.Syntax):
             return self.error(
                 "Was not expecting %r here." % self.tokens.peek(0).name,
                 start_token=self.tokens.peek(0))
-        else:
-            return self.error("Unexpected end of input.")
+
+        return self.error("Unexpected end of input.")
 
     def let(self):
         saved_start = self.tokens.matched.start
@@ -500,8 +500,8 @@ class Parser(syntax.Syntax):
                 name = self._guess_name_of(value_expression)
 
                 if (not name or
-                    name in used_names or
-                    (self.scope and name in self.scope)):
+                        name in used_names or
+                        (self.scope and name in self.scope)):
                     # Give up and just use the current idx for key.
                     name = "column_%d" % (idx,)
                 else:

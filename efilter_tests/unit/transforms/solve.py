@@ -17,8 +17,6 @@
 """
 EFILTER test suite.
 """
-
-from builtins import str
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import api
@@ -26,7 +24,6 @@ from efilter import ast
 from efilter import errors
 from efilter import query as q
 
-from efilter.protocols import eq
 from efilter.protocols import reducer
 from efilter.protocols import repeated
 from efilter.protocols import structured
@@ -90,7 +87,7 @@ class SolveTest(testlib.EfilterTestCase):
             " bind('age': 10, 'name': 'Tom'),"
             " bind('age': 8, 'name': 'Jerry')"
             "),"
-            "names = SELECT name FROM users"
+            "names = (SELECT name FROM users) "
             " SELECT * FROM users WHERE name IN names")
 
         self.assertValuesEqual(
@@ -440,7 +437,8 @@ class SolveTest(testlib.EfilterTestCase):
 
         # Subtracting numbers from non numbers just gives None.
         query = q.Query(
-            'SELECT ages - 10 as diff FROM (bind("ages": ["foo", "bar", "baz"]))')
+            'SELECT ages - 10 as diff FROM '
+            '(bind("ages": ["foo", "bar", "baz"]))')
 
         value = list(solve.solve(query, {}).value)
         diff = structured.resolve(value[0], "diff")
@@ -494,7 +492,7 @@ class SolveTest(testlib.EfilterTestCase):
 
         # Same as [1,2] == [1, None]
         self.assertFalse(solve.solve(q.Query("[1, 2] == [1]"),
-                                    mocks.Process(1, None, None)).value)
+                                     mocks.Process(1, None, None)).value)
 
     def testMembership(self):
         # Support tuples (lists):
@@ -562,8 +560,10 @@ class SolveTest(testlib.EfilterTestCase):
                 mocks.Process(1, "initd", None)).value)
 
     def testStrictOrderedSet(self):
-        self.assertFalse(solve.solve(q.Query("pid > 2"),
-                                     mocks.Process(1, None, None)).value)
+        self.assertEqual(
+            solve.solve(q.Query("pid > 2"),
+                        mocks.Process(1, None, None)).value,
+            [False])
 
     def testPartialOrderedSet(self):
         self.assertTrue(solve.solve(q.Query("pid >= 2"),

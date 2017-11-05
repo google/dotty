@@ -84,6 +84,11 @@ class IAssociative(protocol.Protocol):
                            getkeys_runtime, getkeys_static)
 
 
+@dispatch.multimethod
+def isassociative(x):
+    return isinstance(x, IAssociative)
+
+
 IAssociative.implement(for_type=dict,
                        implementations={
                            select: lambda d, key: d[key],

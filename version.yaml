@@ -1,0 +1,7 @@
+dependent_versions:
+- efilter/_version.py
+version_data:
+  codename: EFilter
+  post: '0'
+  rc: '0'
+  version: 1.6.0
