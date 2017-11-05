@@ -27,32 +27,36 @@ from efilter import protocol
 
 @dispatch.multimethod
 def eq(x, y):
-    raise NotImplementedError()
+    """The default simply refers back to python's own comparator."""
+    try:
+        return x == y
+    except TypeError:
+        # If the python comparator fails the values are not equal.
+        return False
 
 
 @dispatch.multimethod
 def ne(x, y):
-    raise NotImplementedError()
+    return not eq(x, y)
 
 
 class IEq(protocol.Protocol):
-    _required_functions = (eq, ne)
+    _required_functions = (eq, )
+    _optional_functions = (ne, )
 
 
 # Default implementations:
+def _robust_cb(cb, *args, **kwargs):
+    try:
+        cb(*args, **kwargs)
+    except TypeError:
+        return False
 
-IEq.implement(
-    for_type=protocol.AnyType,
-    implementations={
-        eq: lambda x, y: x == y,
-        ne: lambda x, y: x != y
-    }
-)
 
+# Lists are compared sorted so we dont care about their order.
 IEq.implement(
     for_types=(list, tuple),
     implementations={
-        eq: lambda x, y: sorted(x) == sorted(y),
-        ne: lambda x, y: sorted(x) != sorted(y),
+        eq: _robust_cb(lambda x, y: sorted(x) == sorted(y)),
     }
 )

@@ -26,7 +26,6 @@ from efilter.transforms import asdottysql
 from efilter.transforms import aslisp
 from efilter.transforms import normalize
 from efilter.transforms import solve
-from efilter.transforms import validate
 
 from efilter_tests import testlib
 

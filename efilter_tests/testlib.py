@@ -27,8 +27,6 @@ import unittest
 
 from efilter import protocol
 
-from efilter.ext import row_tuple
-
 from efilter.protocols import repeated
 
 
@@ -73,8 +71,6 @@ class EfilterTestCase(unittest.TestCase):
             for x in seq:
                 if isinstance(x, dict):
                     yield sorted(x.items())
-                elif isinstance(x, row_tuple.RowTuple):
-                    yield sorted(x.ordered_dict.items())
                 else:
                     yield x
 

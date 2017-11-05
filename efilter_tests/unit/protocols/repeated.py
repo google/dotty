@@ -19,9 +19,9 @@ EFILTER test suite.
 """
 
 __author__ = "Adam Sindelar <adamsh@google.com>"
+import unittest
 
 import six
-import unittest
 
 from efilter.protocols import eq
 from efilter.protocols import repeated
@@ -57,23 +57,9 @@ class RepeatedTest(unittest.TestCase):
 
     def testNulls(self):
         r = None
-        for _ in repeated.getvalues(r):
-            # Should be zero elements but not raise.
-            self.assertFail()
+        # Should be zero elements but not raise.
+        self.assertEqual(repeated.getvalues(r), ())
 
         r = repeated.meld(None, None)
         # None should get skipped.
-        for _ in repeated.getvalues(r):
-            self.assertFail()
-
-    def testNesting(self):
-        """Test that repeated vars remain flat."""
-        r = repeated.repeated("foo", "bar")
-        r = repeated.repeated(r, "baz")
-        self.assertValueEq(repeated.repeated("foo", "bar", "baz"), r)
-
-        r = repeated.repeated("zoo", r)
-        self.assertValueEq(repeated.repeated("zoo", "foo", "bar", "baz"), r)
-
-        # Order should be preserved for getvalues, though.
-        self.assertEqual(repeated.getvalues(r), ["zoo", "foo", "bar", "baz"])
+        self.assertEqual(repeated.getvalues(r), ())

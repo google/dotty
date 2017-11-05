@@ -26,28 +26,23 @@ from efilter import dispatch
 from efilter import protocol
 
 from efilter.protocols import counted
-from efilter.protocols import eq
-from efilter.protocols import ordered
 
 # Declarations:
 # pylint: disable=unused-argument
 
 
 @dispatch.multimethod
-def repeated(first_value, *values):
-    """Build a repeated variable from values, all of which are the same type.
+def repeated(*values):
+    """Build a repeated variable from values.
 
     Repeated values usually [1] preserve order and always allow a single value
     to appear more than once. Order of repeated values is NOT significant even
     when it is preserved.
 
-    Any repeated values passed to this function will be flattened (repeated
-    values do not nest).
-
     1: Order is always preserved for repetead values created with 'repeated' or
     'meld' but not for repeated values created with other functions.
     """
-    raise NotImplementedError()
+    return values
 
 
 def meld(*values):
@@ -121,6 +116,7 @@ def getvalue(x):
 
     for value in getvalues(x):
         return value
+
 
 @dispatch.multimethod
 def isrepeating(x):

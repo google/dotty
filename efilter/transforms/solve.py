@@ -36,8 +36,6 @@ from efilter import protocol
 from efilter import query as q
 from efilter import scope
 
-from efilter.ext import row_tuple
-
 from efilter.protocols import applicative
 from efilter.protocols import associative
 from efilter.protocols import boolean
@@ -258,7 +256,7 @@ def solve_bind(expr, vars):
         values.append(value)
         local_scope = scope.ScopeStack(local_scope, {key: value})
 
-    result = row_tuple.RowTuple(ordered_columns=keys)
+    result = {}
     for k, v in zip(keys, values):
         result[k] = v
 
