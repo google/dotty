@@ -16,7 +16,6 @@ try:
 except:
     MY_DIR = None
 
-
 def is_tree_dirty():
     try:
         return bool(subprocess.check_output(
@@ -26,7 +25,6 @@ def is_tree_dirty():
     except (OSError, subprocess.CalledProcessError):
         return False
 
-
 def get_version_file_path(version_file="version.yaml"):
     try:
         return os.path.join(subprocess.check_output(
@@ -35,7 +33,6 @@ def get_version_file_path(version_file="version.yaml"):
         ).decode("utf-8").strip(), version_file)
     except (OSError, subprocess.CalledProcessError):
         return None
-
 
 def number_of_commit_since(version_file="version.yaml"):
     """Returns the number of commits since version.yaml was changed."""
@@ -62,7 +59,6 @@ def get_current_git_hash():
         ).strip()
     except (OSError, subprocess.CalledProcessError):
         return None
-
 
 def tag_version_data(version_data, version_path="version.yaml"):
     current_hash = get_current_git_hash()
@@ -94,10 +90,8 @@ def tag_version_data(version_data, version_path="version.yaml"):
 
     return version_data
 
-
 def get_versions():
     return tag_version_data(raw_versions(), """version.yaml""")
-
 
 def raw_versions():
     return json.loads("""
