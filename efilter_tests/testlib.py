@@ -22,6 +22,7 @@ from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import os
+import sys
 import subprocess
 import unittest
 
@@ -41,7 +42,7 @@ def get_fixture_path(name):
 
 class EfilterTestCase(unittest.TestCase):
     def runPythonScript(self, script_path, args=()):
-        cmd = ["python", os.path.join(os.getcwd(), script_path)]
+        cmd = [sys.executable, os.path.join(os.getcwd(), script_path)]
         cmd.extend(args)
         proc = subprocess.Popen(args=cmd,
                                 stdout=subprocess.PIPE,
