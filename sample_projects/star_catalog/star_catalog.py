@@ -28,8 +28,8 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 import os
 
 
-# The API module is the easiest way to use EFILTER - the functions, 'apply',
-# 'search' and 'infer', take care of parsing and using the query.
+# The API module is the easiest way to use EFILTER - the functions,
+# 'apply' and 'search' take care of parsing and using the query.
 from efilter import api
 
 
@@ -79,14 +79,6 @@ QUERIES = [
 def main():
     for description, query in QUERIES:
         print("# %s\n%s" % (description, query))
-
-        # We can find out what the EFILTER query will return by using the type
-        # inference system. If it is a repeated value, we can render it in
-        # multiple rows.
-        result_type = api.infer(query,
-                                replacements=[CATALOG_PATH],
-                                libs=("stdcore", "stdio"))
-        print("# Return type will be %s." % (result_type.__name__,))
 
         # api.apply will give us the actual result of running the query, which
         # should be of the type we got above.

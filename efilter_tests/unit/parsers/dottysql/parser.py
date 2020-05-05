@@ -18,6 +18,7 @@
 EFILTER test suite.
 """
 
+from builtins import str
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter_tests import testlib
@@ -394,13 +395,6 @@ class ParserTest(testlib.EfilterTestCase):
                        ast.Literal(2),
                        ast.Literal(3)))
 
-    def testIsInstance(self):
-        self.assertQueryMatches(
-            "5 isa int",
-            ast.IsInstance(
-                ast.Literal(5),
-                ast.Var("int")))
-
     def testCast(self):
         self.assertQueryMatches(
             "cast(5, int)",
@@ -565,7 +559,7 @@ class ParserTest(testlib.EfilterTestCase):
                             ast.Literal(5))))))
 
     def testFullSelect(self):
-        query = ("SELECT proc.parent.pid AS ppid, proc.pid"
+        query = ("SELECT proc.parent.pid AS ppid_column, proc.pid"
                  " FROM pslist(pid: 10, ppid: 20)"
                  " WHERE count(proc.open_files) > 10"
                  " ORDER BY proc.command DESC"
@@ -594,18 +588,19 @@ class ParserTest(testlib.EfilterTestCase):
                                         ast.Var("ppid"),
                                         ast.Literal(20))),
                                 ast.StrictOrderedSet(
+                                    ast.Literal(10),
                                     ast.Apply(
                                         ast.Var("count"),
                                         ast.Resolve(
                                             ast.Var("proc"),
                                             ast.Literal("open_files"))),
-                                    ast.Literal(10))),
+                                )),
                             ast.Resolve(
                                 ast.Var("proc"),
                                 ast.Literal("command")))))),
             ast.Bind(
                 ast.Pair(
-                    ast.Literal("ppid"),
+                    ast.Literal("ppid_column"),
                     ast.Resolve(
                         ast.Resolve(
                             ast.Var("proc"),
@@ -630,12 +625,13 @@ class ParserTest(testlib.EfilterTestCase):
                         ast.Var("pslist"),
                         ast.Literal(10)),
                     ast.StrictOrderedSet(
+                        ast.Literal(10),
                         ast.Apply(
                             ast.Var("COUNT"),
                             ast.Resolve(
                                 ast.Var("proc"),
                                 ast.Literal("open_files"))),
-                        ast.Literal(10))),
+                    )),
                 ast.Bind(
                     ast.Pair(
                         ast.Literal("ppid"),

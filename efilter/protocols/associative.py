@@ -84,14 +84,28 @@ class IAssociative(protocol.Protocol):
                            getkeys_runtime, getkeys_static)
 
 
+@dispatch.multimethod
+def isassociative(x):
+    return isinstance(x, IAssociative)
+
+
 IAssociative.implement(for_type=dict,
                        implementations={
                            select: lambda d, key: d[key],
-                           getkeys_runtime: lambda d: d.keys()})
+                           reflect_runtime_key: lambda x, k: x.get(k),
+                           getkeys_runtime: lambda d: list(d.keys())})
+
+
+def IAssociative_select(c, idx):
+    """Out of bound reference just returns None."""
+    try:
+        return c[idx]
+    except IndexError:
+        return None
 
 
 IAssociative.implement(
     for_types=(list, tuple),
     implementations={
-        select: lambda c, idx: c[idx],
+        select: IAssociative_select,
         getkeys_runtime: lambda c: six.moves.range(counted.count(c))})

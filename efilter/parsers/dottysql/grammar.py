@@ -18,6 +18,7 @@
 This module implements the DottySQL grammar (on tokens, not on a query string).
 """
 
+from builtins import next
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import ast
@@ -73,25 +74,20 @@ OPERATORS = common.OperatorTable(
                     docstring="Left-hand operand is in list.",
                     prefix=None, suffix=None,
                     infix=common.Token("symbol", "in")),
-    common.Operator(name="isa", precedence=3, assoc="left",
-                    handler=ast.IsInstance,
-                    docstring="LHS must be instance of RHS.",
-                    prefix=None, suffix=None,
-                    infix=common.Token("symbol", "isa")),
     common.Operator(name=">=", precedence=3, assoc="left",
-                    handler=ast.PartialOrderedSet,
+                    handler=transforms.ReversePartialOrderedSet,
                     docstring="Equal-or-greater-than.", prefix=None,
                     suffix=None, infix=common.Token("symbol", ">=")),
     common.Operator(name="<=", precedence=3, assoc="left",
-                    handler=transforms.ReversePartialOrderedSet,
+                    handler=ast.PartialOrderedSet,
                     docstring="Equal-or-less-than.", prefix=None,
                     suffix=None, infix=common.Token("symbol", "<=")),
     common.Operator(name=">", precedence=3, assoc="left",
-                    handler=ast.StrictOrderedSet,
+                    handler=transforms.ReverseStrictOrderedSet,
                     docstring="Greater-than.", prefix=None, suffix=None,
                     infix=common.Token("symbol", ">")),
     common.Operator(name="<", precedence=3, assoc="left",
-                    handler=transforms.ReverseStrictOrderedSet,
+                    handler=ast.StrictOrderedSet,
                     docstring="Less-than.", prefix=None, suffix=None,
                     infix=common.Token("symbol", "<")),
     common.Operator(name="+", precedence=4, assoc="left", handler=ast.Sum,

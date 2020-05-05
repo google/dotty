@@ -26,6 +26,8 @@ from efilter import api
 from efilter import errors
 from efilter import protocol
 
+from efilter.protocols import number
+
 
 class APITest(testlib.EfilterTestCase):
     def testApply(self):
@@ -51,11 +53,11 @@ class APITest(testlib.EfilterTestCase):
     def testLet(self):
         self.assertEqual(
             api.apply("let(x = 5, y = 10 * 2) x + y"),
-            25)
+            [25])
 
         self.assertEqual(
             api.apply("let(x = 5, y = 10 * x, z = (x + y)) z - y"),
-            5)
+            [5])
 
     def testSearch(self):
         self.assertSequenceEqual(
@@ -64,15 +66,6 @@ class APITest(testlib.EfilterTestCase):
                 data=[dict(name="Peter", age=20),
                       dict(name="Paul", age=30)])),
             [dict(age=20, name="Peter")])
-
-    def testInfer(self):
-        self.assertIsa(int, api.infer("5 + 5"))
-
-        # Test that IO needs to be explicit.
-        self.assertEqual(protocol.AnyType,
-                         api.infer("csv(path, decode_header:true)"))
-        self.assertIsa(dict, api.infer("csv(path, decode_header:true)",
-                                       libs=("stdcore", "stdio")))
 
     def testUserFunc(self):
         with self.assertRaises(errors.EfilterKeyError):
@@ -89,3 +82,43 @@ class APITest(testlib.EfilterTestCase):
         result = api.apply("my_func(1, 5)",
                            vars={"my_func": api.user_func(my_func)})
         self.assertEqual(result, 6)
+
+    def testScalarFunc(self):
+        # Define numeric addition.
+        def my_func(x, y):
+            return x + y
+
+        # Two scalars.
+        result = api.apply(
+            "my_func(1, 5)",
+            vars={"my_func": api.scalar_function(
+                my_func, (number.INumber, number.INumber))})
+        self.assertEqual(result, [6])
+
+        # Scalar is repeated to length of vector.
+        result = api.apply(
+            "my_func(1, [1, 5])",
+            vars={"my_func": api.scalar_function(
+                my_func, (number.INumber, number.INumber))})
+        self.assertEqual(result, [2, 6])
+
+        # If a type is non numeric then skip calling the function.
+        result = api.apply(
+            "my_func(1, [1, 'a'])",
+            vars={"my_func": api.scalar_function(
+                my_func, (number.INumber, number.INumber))})
+        self.assertEqual(result, [2, None])
+
+        # Two vectors are added one element at a time.
+        result = api.apply(
+            "my_func([1, 2], [1, 5])",
+            vars={"my_func": api.scalar_function(
+                my_func, (number.INumber, number.INumber))})
+        self.assertEqual(result, [2, 7])
+
+        # Short vectors are padded to the longest vector.
+        result = api.apply(
+            "my_func([1, 2], [1, 5, 7])",
+            vars={"my_func": api.scalar_function(
+                my_func, (number.INumber, number.INumber))})
+        self.assertEqual(result, [2, 7, 7])

@@ -21,12 +21,15 @@ EFILTER type system.
 
 This module implements multimethod function dispatch.
 """
+from __future__ import print_function
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import functools
-import six
 import threading
+
+import six
 
 
 def memoize(func):
@@ -203,7 +206,7 @@ class multimethod(object):
             if isinstance(None, dispatch_type):
                 raise TypeError(
                     "%r was passed None for first argument, which was "
-                    "unexpected." % self.func_name)
+                    "unexpected." % self.__class__.__name__)
 
             implemented_types = [t for t, _ in self.implementations]
             raise NotImplementedError(
@@ -320,7 +323,7 @@ class multimethod(object):
                                 "Two candidate implementations found for "
                                 "multimethod function %s (dispatch type %s) "
                                 "and neither is preferred." %
-                                (self.func_name, dispatch_type))
+                                (self.__class__.__name__, dispatch_type))
                     else:
                         result = candidate_func
                         result_type = candidate_type

@@ -38,13 +38,14 @@ basic type inference, by annotating each expression type with sets of
 protocols it requires on its children and guarantees on its return type.
 """
 
+from builtins import object as newobject
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import abc
 import six
 
 
-class AnyType(object):
+class AnyType(newobject):
     """Sentinel used to provide a default implementation of a protocol.
 
     If you need to provide a default implementation of functions in a
@@ -63,6 +64,7 @@ class AnyType(object):
         implements(5, MyProtocol)  # => True
     """
 
+
 BUILTIN_TYPES = [float, complex, type(None), AnyType, set, frozenset,
                  list, dict, tuple]
 
@@ -73,6 +75,8 @@ BUILTIN_TYPES.extend(six.string_types)
 def implements(obj, protocol):
     """Does the object 'obj' implement the 'prococol'?"""
     if isinstance(obj, type):
+        import pdb
+        pdb.set_trace()
         raise TypeError("First argument to implements must be an instance. "
                         "Got %r." % obj)
     return isinstance(obj, protocol) or issubclass(AnyType, protocol)
@@ -90,7 +94,8 @@ def isa(cls, protocol):
     return issubclass(cls, protocol) or issubclass(AnyType, protocol)
 
 
-class Protocol(six.with_metaclass(abc.ABCMeta, object)):
+@six.add_metaclass(abc.ABCMeta)
+class Protocol(object):
     """Collection of related functions that operate on a type (interface)."""
 
     _required_functions = frozenset()

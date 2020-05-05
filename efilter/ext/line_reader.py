@@ -18,10 +18,12 @@
 Implements IRepeated for text files and some common formats.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
-import six
 import threading
+
+import six
 
 from efilter.protocols import counted
 from efilter.protocols import repeated
@@ -70,12 +72,6 @@ class LazyLineReader(object):
     def value_type(self):
         return six.string_types[0]
 
-    def value_eq(self, other):
-        if isinstance(other, type(self)):
-            return self.fd == other.fd
-
-        return list(self) == list(other)
-
     def value_apply(self, f):
         for value in self:
             yield f(value)
@@ -88,6 +84,7 @@ class LazyLineReader(object):
             c += 1
 
         return c
+
 
 counted.ICounted.implicit_static(for_type=LazyLineReader)
 repeated.IRepeated.implicit_static(LazyLineReader)

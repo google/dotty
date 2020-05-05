@@ -18,6 +18,8 @@
 This module implements a reusable expression tokenizer.
 """
 
+from builtins import next
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 
@@ -350,11 +352,16 @@ class LazyTokenizer(object):
         self.string = ""
         self.string_position = match.start()
 
+    escaped_map = {
+        "r": "\r",
+        "n": "\n",
+        "t": "\t",
+        "b": "\b",
+    }
+
     def string_escape(self, string, match, **_):
-        if match.group(1) in "'\"rnbt":
-            self.string += string.decode("string_escape")
-        else:
-            self.string += string
+        escaped_char = string[1]
+        self.string += self.escaped_map.get(escaped_char, escaped_char)
 
     def string_append(self, string="", **_):
         self.string += string

@@ -25,9 +25,9 @@ from efilter import query as q
 from efilter import scope
 
 from efilter.protocols import repeated
+from efilter.protocols import string
 
 from efilter.transforms import solve
-from efilter.transforms import infer_type
 
 from efilter.stdlib import core as std_core
 
@@ -193,61 +193,67 @@ def user_func(func, arg_types=None, return_type=None):
     return UserFunction()
 
 
-def infer(query, replacements=None, root_type=None,
-          libs=("stdcore", "stdmath")):
-    """Determine the type of the query's output without actually running it.
+def scalar_function(func, arg_types=(string.IString,), pad=0):
+    """Defines a function which operates on a scalar.
 
-    Arguments:
-        query: A query object or string with the query.
-        replacements: Built-time parameters to the query, either as dict or as
-            an array (for positional interpolation).
-        root_type: The types of variables to be supplied to the query inference.
-        libs: What standard libraries should be taken into account for the
-            inference.
+    If a repeated value is provided, then this will be called once on
+    each arg and the result will be packaged in a list. This allows
+    users to define a single function which works both on repeated and
+    non repeated values.
 
-    Returns:
-        The type of the query's output, if it can be determined. If undecidable,
-        returns efilter.protocol.AnyType.
-
-        NOTE: The inference returns the type of a row in the results, not of the
-        actual Python object returned by 'apply'. For example, if a query
-        returns multiple rows, each one of which is an integer, the type of the
-        output is considered to be int, not a collection of rows.
-
-    Examples:
-        infer("5 + 5") # -> INumber
-
-        infer("SELECT * FROM people WHERE age > 10") # -> AnyType
-
-        # If root_type implements the IStructured reflection API:
-        infer("SELECT * FROM people WHERE age > 10", root_type=...) # -> dict
+    The arg_types tuple should specify the protocols the args must
+    support. If the arg does not support this protocol, the wrapper
+    returns None without calling the func.
     """
-    # Always make the scope stack start with stdcore.
-    if root_type:
-        type_scope = scope.ScopeStack(std_core.MODULE, root_type)
-    else:
-        type_scope = scope.ScopeStack(std_core.MODULE)
+    class UserFunction(std_core.TypedFunction):
+        name = func.__name__
 
-    stdcore_included = False
-    for lib in libs:
-        if lib == "stdcore":
-            stdcore_included = True
-            continue
+        def __call__(self, *args, **kwargs):
+            result = []
+            expanded_args = []
+            max_length = 1
+            for expanded_arg in args:
+                if repeated.isrepeating(expanded_arg):
+                    # Materialize it.
+                    expanded_arg = list(expanded_arg)
+                    max_length = max(max_length, len(expanded_arg))
+                expanded_args.append(expanded_arg)
 
-        module = std_core.LibraryModule.ALL_MODULES.get(lib)
-        if not module:
-            raise TypeError("No standard library module %r." % lib)
+            # Second pass pad or expand to the correct length.
+            padded_args = []
+            for expanded_arg in expanded_args:
+                if isinstance(expanded_arg, list):
+                    expanded_arg.extend([pad] * (max_length-len(expanded_arg)))
+                else:
+                    expanded_arg = [expanded_arg] * max_length
+                padded_args.append(expanded_arg)
 
-        type_scope = scope.ScopeStack(module, type_scope)
+            for args in zip(*padded_args):
+                result.append(self._call_on_scalar(args, kwargs))
 
-    if not stdcore_included:
-        raise TypeError("'stdcore' must always be included.")
+            return result
 
-    query = q.Query(query, params=replacements)
-    return infer_type.infer_type(query, type_scope)
+        def _call_on_scalar(self, args, kwargs):
+            # Type check args
+            for arg, arg_type in zip(args, arg_types):
+                if arg_type is not None and not isinstance(arg, arg_type):
+                    return None
+
+            return func(*args, **kwargs)
+
+        @classmethod
+        def reflect_static_args(cls):
+            return arg_types
+
+        @classmethod
+        def reflect_static_return(cls):
+            return return_type
+
+    return UserFunction()
 
 
 def search(query, data, replacements=None):
+
     """Yield objects from 'data' that match the 'query'."""
     query = q.Query(query, params=replacements)
     for entry in data:

@@ -17,7 +17,9 @@
 # limitations under the License.
 
 """EFILTER abstract type system."""
+from __future__ import division
 
+from past.utils import old_div
 import six
 
 from efilter import dispatch
@@ -46,6 +48,10 @@ def difference(x, y):
 @dispatch.multimethod
 def quotient(x, y):
     raise NotImplementedError()
+
+
+def isnumber(element):
+    return isinstance(element, INumber)
 
 
 class INumber(protocol.Protocol):

@@ -33,7 +33,7 @@ class CoreTest(testlib.EfilterTestCase):
 
         self.assertEqual(core.First()(1), 1)
 
-        self.assertEqual(core.First()([1, 2]), [1, 2])
+        self.assertEqual(core.First()([1, 2]), 1)
 
         self.assertEqual(core.First()(None), None)
 

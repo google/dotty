@@ -18,6 +18,7 @@
 EFILTER test suite.
 """
 
+from builtins import next
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter_tests import testlib
@@ -33,10 +34,6 @@ class StdlibIntegrationTest(testlib.EfilterTestCase):
     def testFuncCalls(self):
         """Test that function calls are completed."""
         self.assertEqual(api.apply("count((1, 2, 3))"), 3)
-
-    def testInference(self):
-        """Test that infer_type correctly uses reflection on stdlib."""
-        self.assertEqual(api.infer("count((1, 2, 3))"), int)
 
     def testIOReads(self):
         """Test that IO is properly hooked up when requested."""
@@ -91,7 +88,7 @@ class StdlibIntegrationTest(testlib.EfilterTestCase):
         self.assertEqual(api.apply("count([1, 2, 3])"), 3)
 
         # IRepeated are flat.
-        self.assertEqual(api.apply("count((1, (2, 3)))"), 3)
+        self.assertEqual(api.apply("count((1, (2, 3)))"), 2)
 
         # Lists are not.
         self.assertEqual(api.apply("count([1, [2, 3]])"), 2)

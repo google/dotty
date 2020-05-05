@@ -22,17 +22,13 @@ __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter.transforms import asdottysql
 from efilter.transforms import aslisp
-from efilter.transforms import infer_type
 from efilter.transforms import normalize
 from efilter.transforms import solve
-from efilter.transforms import validate
 
 from efilter_tests.unit.transforms import asdottysql as asdottysql_test
 from efilter_tests.unit.transforms import aslisp as aslisp_test
-from efilter_tests.unit.transforms import infer_type as infer_type_test
 from efilter_tests.unit.transforms import normalize as normalize_test
 from efilter_tests.unit.transforms import solve as solve_test
-from efilter_tests.unit.transforms import validate as validate_test
 
 from efilter_tests import testlib
 
@@ -59,16 +55,9 @@ class UnitCoverageTest(testlib.EfilterTestCase):
     def testAsLispCoverage(self):
         self.assertUnitCoverage(aslisp.aslisp, aslisp_test.AsLispTest)
 
-    def testInferTypeCoverage(self):
-        self.assertUnitCoverage(infer_type.infer_type,
-                                infer_type_test.InferTypeTest)
-
     def testNormalizeCoverage(self):
         self.assertUnitCoverage(normalize.normalize,
                                 normalize_test.NormalizeTest)
 
     def testSolveCoverage(self):
         self.assertUnitCoverage(solve.solve, solve_test.SolveTest)
-
-    def testValidateCoverage(self):
-        self.assertUnitCoverage(validate.validate, validate_test.ValidateTest)

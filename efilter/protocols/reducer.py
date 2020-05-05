@@ -18,6 +18,8 @@
 
 """(EXPERIMENTAL) EFILTER abstract type system."""
 
+from builtins import next
+from builtins import object
 import itertools
 
 from efilter import dispatch

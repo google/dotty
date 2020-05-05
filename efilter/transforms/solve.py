@@ -18,11 +18,14 @@
 EFILTER individual object filter and matcher.
 """
 
+from builtins import next
+from builtins import zip
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 # pylint: disable=function-redefined
 
 import collections
+import functools
 import re
 import six
 
@@ -33,21 +36,23 @@ from efilter import protocol
 from efilter import query as q
 from efilter import scope
 
-from efilter.ext import row_tuple
-
 from efilter.protocols import applicative
 from efilter.protocols import associative
 from efilter.protocols import boolean
-from efilter.protocols import counted
+from efilter.protocols import eq
 from efilter.protocols import number
 from efilter.protocols import ordered
 from efilter.protocols import reducer
 from efilter.protocols import repeated
+from efilter.protocols import string
 from efilter.protocols import structured
 
 from efilter.stdlib import core as std_core
 
 Result = collections.namedtuple("Result", ["value", "branch"])
+
+if six.PY3:
+    unicode = str
 
 
 @dispatch.multimethod
@@ -68,8 +73,7 @@ def solve(query, vars):
     Returns:
         Instance of Result, with members set as follows:
 
-            value: The result of evaluation. The type of the result can be
-                determined by calling infer_type on 'query'.
+            value: The result of evaluation.
 
             branch: An instance of Expression, representing a subtree of 'query'
                 that was that last branch evaluated before a match was produced.
@@ -79,120 +83,6 @@ def solve(query, vars):
     """
     _ = query, vars
     raise NotImplementedError()
-
-
-def __solve_for_repeated(expr, vars):
-    """Helper: solve 'expr' always returning an IRepeated.
-
-    If the result of solving 'expr' is a list or a tuple of IStructured objects
-    then treat is as a repeated value of IStructured objects because that's
-    what the called meant to do. This is a convenience helper so users of the
-    API don't have to create IRepeated objects.
-
-    If the result of solving 'expr' is a scalar then return it as a repeated
-    value of one element.
-
-    Arguments:
-        expr: Expression to solve.
-        vars: The scope.
-
-    Returns:
-        IRepeated result of solving 'expr'.
-        A booelan to indicate whether the original was repeating.
-    """
-    var = solve(expr, vars).value
-    if (var and isinstance(var, (tuple, list))
-            and protocol.implements(var[0], structured.IStructured)):
-        return repeated.meld(*var), False
-
-    return var, repeated.isrepeating(var)
-
-
-def __solve_for_scalar(expr, vars):
-    """Helper: solve 'expr' always returning a scalar (not IRepeated).
-
-    If the output of 'expr' is a single value or a single RowTuple with a single
-    column then return the value in that column. Otherwise raise.
-
-    Arguments:
-        expr: Expression to solve.
-        vars: The scope.
-
-    Returns:
-        A scalar value (not an IRepeated).
-
-    Raises:
-        EfilterTypeError if it cannot get a scalar.
-    """
-    var = solve(expr, vars).value
-    try:
-        scalar = repeated.getvalue(var)
-    except TypeError:
-        raise errors.EfilterTypeError(
-            root=expr, query=expr.source,
-            message="Wasn't expecting more than one value here. Got %r."
-            % (var,))
-
-    if isinstance(scalar, row_tuple.RowTuple):
-        try:
-            return scalar.get_singleton()
-        except ValueError:
-            raise errors.EfilterTypeError(
-                root=expr, query=expr.source,
-                message="Was expecting a scalar value here. Got %r."
-                % (scalar,))
-    else:
-        return scalar
-
-
-def __solve_and_destructure_repeated(expr, vars):
-    """Helper: solve 'expr' always returning a list of scalars.
-
-    If the output of 'expr' is one or more row tuples with only a single column
-    then return a repeated value of values in that column. If there are more
-    than one column per row then raise.
-
-    This returns a list because there's no point in wrapping the scalars in
-    a repeated value for use internal to the implementing solver.
-
-    Returns:
-        Two values:
-         - An iterator (not an IRepeated!) of scalars.
-         - A boolean to indicate whether the original value was repeating.
-
-    Raises:
-        EfilterTypeError if the values don't conform.
-    """
-    iterable, isrepeating = __solve_for_repeated(expr, vars)
-    if iterable is None:
-        return (), isrepeating
-
-    if not isrepeating:
-        return [iterable], False
-
-    values = iter(iterable)
-
-    try:
-        value = next(values)
-    except StopIteration:
-        return (), True
-
-    if not isinstance(value, row_tuple.RowTuple):
-        result = [value]
-        # We skip type checking the remaining values because it'd be slow.
-        result.extend(values)
-        return result, True
-
-    try:
-        result = [value.get_singleton()]
-        for value in values:
-            result.append(value.get_singleton())
-
-        return result, True
-    except ValueError:
-        raise errors.EfilterTypeError(
-            root=expr, query=expr.source,
-            message="Was expecting exactly one column in %r." % (value,))
 
 
 def __nest_scope(expr, outer, inner):
@@ -214,7 +104,6 @@ def solve_query(query, vars):
     # Standard library must always be included. Others are optional, and the
     # caller can add them to vars using ScopeStack.
     vars = scope.ScopeStack(std_core.MODULE, vars)
-
     try:
         return solve(query.root, vars)
     except errors.EfilterError as error:
@@ -264,7 +153,7 @@ def solve_select(expr, vars):
     selecting from a repeated value implies a map-like operation and returns a
     new repeated value.
     """
-    data, _ = __solve_for_repeated(expr.lhs, vars)
+    data = solve(expr.lhs, vars).value
     key = solve(expr.rhs, vars).value
 
     try:
@@ -296,30 +185,34 @@ def solve_resolve(expr, vars):
     resolving from a repeated value implies a map-like operation and returns a
     new repeated values.
     """
-    objs, _ = __solve_for_repeated(expr.lhs, vars)
+    objs = solve(expr.lhs, vars).value
     member = solve(expr.rhs, vars).value
+    results = []
 
-    try:
-        results = [structured.resolve(o, member)
-                   for o in repeated.getvalues(objs)]
-    except (KeyError, AttributeError):
-        # Raise a better exception for the non-existent member.
-        raise errors.EfilterKeyError(root=expr.rhs, key=member,
-                                     query=expr.source)
-    except (TypeError, ValueError):
-        # Is this a null object error?
-        if vars.locals is None:
-            raise errors.EfilterNoneError(
-                root=expr, query=expr.source,
-                message="Cannot resolve member %r from a null." % member)
+    if repeated.isrepeating(objs):
+        for o in repeated.getvalues(objs):
+            results.append(structured.resolve(o, member))
+
+        return Result(results, ())
+
+    return Result(structured.resolve(objs, member), ())
+
+
+def parse_apply_args(args_ast, scope_):
+    args = []
+    kwargs = {}
+    for arg in args_ast:
+        if isinstance(arg, ast.Pair):
+            if not isinstance(arg.lhs, ast.Var):
+                raise errors.EfilterError(
+                    root=arg.lhs,
+                    message="Invalid argument name.")
+
+            kwargs[arg.key.value] = solve(arg.value, scope_).value
         else:
-            raise
-    except NotImplementedError:
-        raise errors.EfilterError(
-            root=expr, query=expr.source,
-            message="Cannot resolve members from a non-structured value.")
+            args.append(solve(arg, scope_).value)
 
-    return Result(repeated.meld(*results), ())
+    return args, kwargs
 
 
 @solve.implementation(for_type=ast.Apply)
@@ -331,20 +224,8 @@ def solve_apply(expr, vars):
     a whitelist. EFILTER will never directly call a function that wasn't
     provided through a protocol implementation.
     """
-    func = __solve_for_scalar(expr.func, vars)
-    args = []
-    kwargs = {}
-    for arg in expr.args:
-        if isinstance(arg, ast.Pair):
-            if not isinstance(arg.lhs, ast.Var):
-                raise errors.EfilterError(
-                    root=arg.lhs,
-                    message="Invalid argument name.")
-
-            kwargs[arg.key.value] = solve(arg.value, vars).value
-        else:
-            args.append(solve(arg, vars).value)
-
+    func = solve(expr.func, vars).value
+    args, kwargs = parse_apply_args(expr.args, vars)
     result = applicative.apply(func, args, kwargs)
 
     return Result(result, ())
@@ -364,26 +245,20 @@ def solve_bind(expr, vars):
     | | Second Key Expression
     | | Second Value Expression
     Etc...
-
-    As we evaluate the subtree, each subsequent KV pair is evaluated with
-    the all previous bingings already in scope. For example:
-
-    bind(x: 5, y: x + 5)  # Will bind y = 10 because x is already available.
     """
-    value_expressions = []
+    local_scope = vars
+    values = []
     keys = []
     for pair in expr.children:
-        keys.append(solve(pair.key, vars).value)
-        value_expressions.append(pair.value)
+        key = solve(pair.key, local_scope).value
+        keys.append(key)
+        value = solve(pair.value, local_scope).value
+        values.append(value)
+        local_scope = scope.ScopeStack(local_scope, {key: value})
 
-    result = row_tuple.RowTuple(ordered_columns=keys)
-    intermediate_scope = scope.ScopeStack(vars, result)
-
-    for idx, value_expression in enumerate(value_expressions):
-        value = solve(value_expression, intermediate_scope).value
-        # Update the intermediate bindings so as to make earlier bindings
-        # already available to the next child-expression.
-        result[keys[idx]] = value
+    result = {}
+    for k, v in zip(keys, values):
+        result[k] = v
 
     return Result(result, ())
 
@@ -432,7 +307,7 @@ def solve_map(expr, vars):
     evaluate to {"name": "Bob"}, which subdict will then be used on the RHS as
     new vars, and that whole form will evaluate to "Bob".
     """
-    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
+    lhs_values = solve(expr.lhs, vars).value
 
     def lazy_map():
         try:
@@ -465,12 +340,23 @@ def solve_filter(expr, vars):
 
     Returns any LHS values for which RHS evaluates to a true value.
     """
-    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
+    lhs_values = solve(expr.lhs, vars).value
 
     def lazy_filter():
         for lhs_value in repeated.getvalues(lhs_values):
-            if solve(expr.rhs, __nest_scope(expr.lhs, vars, lhs_value)).value:
-                yield lhs_value
+            filter_result = solve(expr.rhs, __nest_scope(
+                expr.lhs, vars, lhs_value)).value
+            # Repeating values are chosen if any of the values returns
+            # true.
+            if repeated.isrepeating(filter_result):
+                if any(filter_result):
+                    yield lhs_value
+
+            else:
+                # Todo: Implement a bool protocol - for now we use the
+                # python bool.  Scalar values must evaluate to true.
+                if bool(filter_result):
+                    yield lhs_value
 
     return Result(repeated.lazy(lazy_filter), ())
 
@@ -489,7 +375,7 @@ def solve_reducer(expr, vars):
 
 @solve.implementation(for_type=ast.Group)
 def solve_group(expr, vars):
-    rows, _ = __solve_for_repeated(expr.lhs, vars)
+    rows = solve(expr.lhs, vars).value
     reducers = [solve(child, vars).value for child in expr.reducers]
     r = reducer.Compose(*reducers)
     intermediates = {}
@@ -524,19 +410,33 @@ def solve_group(expr, vars):
     return Result(repeated.meld(*results), ())
 
 
+def _cmp(x, y):
+    if eq.eq(x, y) or eq.eq(y, x):
+        return 0
+
+    if _lt(x, y):
+        return -1
+
+    return 1
+
+
 @solve.implementation(for_type=ast.Sort)
 def solve_sort(expr, vars):
     """Sort values on the LHS by the value they yield when passed to RHS."""
-    lhs_values = repeated.getvalues(__solve_for_repeated(expr.lhs, vars)[0])
-
+    lhs_values = repeated.getvalues(solve(expr.lhs, vars)[0])
     sort_expression = expr.rhs
 
     def _key_func(x):
         return solve(sort_expression, __nest_scope(expr.lhs, vars, x)).value
 
-    results = ordered.ordered(lhs_values, key_func=_key_func)
+    # In order to sort we must expand the list into memory and apply
+    # the sort expression to each element. We then use the ordered and
+    # eq protocols to compare any two items until the list is sorted.
+    sorted_list = [(x, _key_func(x)) for x in lhs_values]
+    key_func = functools.cmp_to_key(_cmp)
+    sorted_list.sort(key=lambda x: key_func(x[1]))
 
-    return Result(repeated.meld(*results), ())
+    return Result([x[0] for x in sorted_list], ())
 
 
 @solve.implementation(for_type=ast.Each)
@@ -549,7 +449,7 @@ def solve_each(expr, vars):
     IAssociative objects then RHS will be evaluated with each state and True
     will be returned only if each result is true.
     """
-    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
+    lhs_values = solve(expr.lhs, vars).value
 
     for lhs_value in repeated.getvalues(lhs_values):
         result = solve(expr.rhs, __nest_scope(expr.lhs, vars, lhs_value))
@@ -563,7 +463,7 @@ def solve_each(expr, vars):
 @solve.implementation(for_type=ast.Any)
 def solve_any(expr, vars):
     """Same as Each, except returning True on first true result at LHS."""
-    lhs_values, _ = __solve_for_repeated(expr.lhs, vars)
+    lhs_values = solve(expr.lhs, vars).value
 
     try:
         rhs = expr.rhs
@@ -608,29 +508,6 @@ def solve_cast(expr, vars):
     return Result(cast_value, ())
 
 
-@solve.implementation(for_type=ast.IsInstance)
-def solve_isinstance(expr, vars):
-    """Typecheck whether LHS is type on the RHS."""
-    lhs = solve(expr.lhs, vars)
-
-    try:
-        t = solve(expr.rhs, vars).value
-    except errors.EfilterKeyError:
-        t = None
-
-    if t is None:
-        raise errors.EfilterTypeError(
-            root=expr.rhs, query=expr.source,
-            message="Cannot find type named %r." % expr.rhs.value)
-
-    if not isinstance(t, type):
-        raise errors.EfilterTypeError(
-            root=expr.rhs, query=expr.source,
-            message="%r is not a type and cannot be used with 'isa'." % (t,))
-
-    return Result(protocol.implements(lhs.value, t), ())
-
-
 @solve.implementation(for_type=ast.Complement)
 def solve_complement(expr, vars):
     result = solve(expr.value, vars)
@@ -639,14 +516,14 @@ def solve_complement(expr, vars):
 
 @solve.implementation(for_type=ast.Intersection)
 def solve_intersection(expr, vars):
-    result = Result(False, ())
     for child in expr.children:
-        result = solve(child, vars)
-        if not result.value:
-            # Intersections don't preserve the last value the way Unions do.
-            return result._replace(value=False)
+        result = solve(child, vars).value
+        if repeated.isrepeating(result) and not any(result):
+            return Result(False, ())
+        elif not result:
+            return Result(False, ())
 
-    return result
+    return Result(True, ())
 
 
 @solve.implementation(for_type=ast.Union)
@@ -672,93 +549,211 @@ def solve_pair(expr, vars):
 
 @solve.implementation(for_type=ast.Sum)
 def solve_sum(expr, vars):
-    total = 0
+    """Handle numerical operators.
 
+    We can mix scalars and repeated elements freely. The result is
+    always repeated. Scalars are turned into repeated lists of the
+    scalar while repeated values are turned into lists padded with the
+    pad element to the longest list we operate on.
+
+    Examples:
+       # Scalars are expanded to repeat themselves.
+       [1, 2] + 4 -> [1, 2] + [4, 4] -> [5, 6]
+
+       # Lists are padded
+       [1, 2] + [1, 2, 3] -> [1, 2, 0] + [1, 2, 3] -> [2, 4, 3]
+
+       # Subselects are expanded if they contain a single column.
+       select hex(offset), hexdump from dump(
+           offset: (-0x20 + (
+               select _EPROCESS.obj_offset from pslist(proc_regex: "svchost"))),
+           rows: 5 )
+    """
+    iterators = convert_to_iterators(expr, vars, pad=0)
+
+    # Add each element individually.
+    result = []
+    for elements in zip(*iterators):
+        total = 0
+        for element in elements:
+            if number.isnumber(element):
+                total = number.sum(element, total)
+
+            # If we encounter a non-number we swallow the error and
+            # return None. This could happen for example if one of the
+            # columns in the select returns NoneObject() or something
+            # which is not a number.
+            else:
+                total = None
+                break
+
+        result.append(total)
+
+    return Result(result, ())
+
+
+def convert_to_list(expr, repeated_list):
+    if not repeated.isrepeating(repeated_list):
+        return [repeated_list]
+
+    result = []
+    for element in repeated_list:
+        if element is not None:
+            # The output from a select is a repeated structured
+            # (dict). If it has a single member we just use that,
+            # otherwise we raise because the query is probably bad
+            # (it should only return a single column).
+            if structured.isstructured(element):
+                members = structured.getmembers(element)
+                if len(members) != 1:
+                    raise errors.EfilterTypeError(
+                        message="Expecting a single column in subselect - "
+                        "got %s columns" % len(members),
+                        query=expr.source)
+
+                element = structured.resolve(element, members[0])
+            result.append(element)
+
+    return result
+
+
+def convert_to_iterators(expr, vars, pad=0):
+    """Solve all children in expr and return a list of iterators.
+
+    Each iterator is expanded or repeated so they are all the same
+    length.
+    """
+    max_length = 0
+    iterators = []
+    # Expand each child into a list.
     for child in expr.children:
-        val = __solve_for_scalar(child, vars)
-        try:
-            total += val
-        except TypeError:
-            raise errors.EfilterTypeError(expected=number.INumber,
-                                          actual=type(val),
-                                          root=child, query=expr.source)
+        val = solve(child, vars).value
+        if repeated.isrepeating(val) and not number.isnumber(val):
+            val = convert_to_list(expr, val)
+            if len(val) > max_length:
+                max_length = len(val)
 
-    return Result(total, ())
+        # This is a scalar - at least of length 1.
+        else:
+            max_length = max(max_length, 1)
+
+        iterators.append(val)
+
+    # Pad all iterator lists to be the same length.
+    for i, item in enumerate(iterators):
+        # Repeat scalar values.
+        if not isinstance(item, list):
+            iterators[i] = [item] * max_length
+
+        # Extend short lists to the required length
+        elif len(item) < max_length:
+            item.extend([pad] * (max_length - len(item)))
+
+    return iterators
 
 
 @solve.implementation(for_type=ast.Difference)
 def solve_difference(expr, vars):
-    children = enumerate(expr.children)
-    _, first_child = next(children)
-    difference = __solve_for_scalar(first_child, vars)
+    iterators = convert_to_iterators(expr, vars, pad=0)
 
-    for idx, child in children:
-        val = __solve_for_scalar(child, vars)
-        try:
-            difference -= val
-        except TypeError:
-            # The type what caused that there error.
-            if idx == 1:
-                actual_t = type(difference)
+    # Add each element individually.
+    result = []
+    for elements in zip(*iterators):
+        total = None
+        for element in elements:
+            if number.isnumber(element):
+                if total is None:
+                    total = element
+                else:
+                    total = -number.difference(element, total)
+
+            # If we encounter a non-number we swallow the error and
+            # return None. This could happen for example if one of the
+            # columns in the select returns NoneObject() or something
+            # which is not a number.
             else:
-                actual_t = type(val)
+                total = None
+                break
 
-            raise errors.EfilterTypeError(expected=number.INumber,
-                                          actual=actual_t,
-                                          root=expr.children[idx - 1],
-                                          query=expr.source)
+        result.append(total)
 
-    return Result(difference, ())
+    return Result(result, ())
 
 
 @solve.implementation(for_type=ast.Product)
 def solve_product(expr, vars):
-    product = 1
+    iterators = convert_to_iterators(expr, vars, pad=0)
 
-    for child in expr.children:
-        val = __solve_for_scalar(child, vars)
-        try:
-            product *= val
-        except TypeError:
-            raise errors.EfilterTypeError(expected=number.INumber,
-                                          actual=type(val),
-                                          root=child,
-                                          query=expr.source)
+    # Add each element individually.
+    result = []
+    for elements in zip(*iterators):
+        total = None
+        for element in elements:
+            if number.isnumber(element):
+                if total is None:
+                    total = element
+                else:
+                    total = number.product(element, total)
 
-    return Result(product, ())
+            # If we encounter a non-number we swallow the error and
+            # return None. This could happen for example if one of the
+            # columns in the select returns NoneObject() or something
+            # which is not a number.
+            else:
+                total = None
+                break
+
+        result.append(total)
+
+    return Result(result, ())
 
 
 @solve.implementation(for_type=ast.Quotient)
 def solve_quotient(expr, vars):
-    children = enumerate(expr.children)
-    _, first_child = next(children)
-    quotient = __solve_for_scalar(first_child, vars)
+    iterators = convert_to_iterators(expr, vars, pad=0)
 
-    for idx, child in children:
-        val = __solve_for_scalar(child, vars)
-        try:
-            quotient /= val
-        except TypeError:
-            # The type what caused that there error.
-            if idx == 1:
-                actual_t = type(quotient)
+    # Add each element individually.
+    result = []
+    for elements in zip(*iterators):
+        total = None
+        for element in elements:
+            if number.isnumber(element):
+                if total is None:
+                    total = element
+                else:
+                    # Division by 0.
+                    if eq.eq(element, 0):
+                        total = None
+                        break
+
+                    total = number.quotient(total, element)
+
+            # If we encounter a non-number we swallow the error and
+            # return None. This could happen for example if one of the
+            # columns in the select returns NoneObject() or something
+            # which is not a number.
             else:
-                actual_t = type(val)
-            raise errors.EfilterTypeError(expected=number.INumber,
-                                          actual=actual_t,
-                                          root=expr.children[idx - 1],
-                                          query=expr.source)
+                total = None
+                break
 
-    return Result(quotient, ())
+        result.append(total)
+
+    return Result(result, ())
 
 
 @solve.implementation(for_type=ast.Equivalence)
 def solve_equivalence(expr, vars):
-    children = iter(expr.children)
-    first_value = __solve_for_scalar(next(children), vars)
-    for child in children:
-        value = __solve_for_scalar(child, vars)
-        if not value == first_value:
+    iterators = convert_to_iterators(expr, vars, pad=0)
+
+    # Add each element individually.
+    for elements in zip(*iterators):
+        elements = iter(elements)
+        try:
+            first = next(elements)
+        except StopIteration:
+            return Result(True, ())
+
+        if not all(eq.eq(first, rest) for rest in elements):
             return Result(False, ())
 
     return Result(True, ())
@@ -766,106 +761,99 @@ def solve_equivalence(expr, vars):
 
 @solve.implementation(for_type=ast.Membership)
 def solve_membership(expr, vars):
-    # There is an expectation that "foo" in "foobar" will be true, and,
-    # simultaneously, that "foo" in ["foobar"] will be false. This is how the
-    # analogous operator works in Python, among other languages. Where this
-    # mental model breaks down is around repeated values, because, in EFILTER,
-    # there is no difference between a tuple of one value and the one value,
-    # so that "foo" in ("foobar") is true, while "foo" in ("foobar", "bar") is
-    # false and "foo" in ("foo", "bar") is again true. These semantics are a
-    # little unfortunate, and it may be that, in the future, the in operator
-    # is disallowed on repeated values to prevent ambiguity.
     needle = solve(expr.element, vars).value
-    if repeated.isrepeating(needle):
-        raise errors.EfilterError(
-            root=expr.element, query=expr.source,
-            message=("More than one value not allowed in the needle. "
-                     "Got %d values.") % counted.count(needle))
+    haystack = convert_to_list(expr.set, solve(expr.set, vars).value)
 
-    # We need to fall through to __solve_and_destructure_repeated to handle
-    # row tuples correctly.
-    haystack, isrepeating = __solve_and_destructure_repeated(expr.set, vars)
-
-    # For non-repeated values just use the first (singleton) value.
-    if not isrepeating:
-        for straw in haystack:
-            haystack = straw
-            break
-
-    if isinstance(haystack, six.string_types):
-        return Result(needle in haystack, ())
-
-    # Repeated values of more than one value and collections behave the same.
-    # There are no proper sets in EFILTER so O(N) is what we get.
-    if isrepeating or isinstance(haystack, (tuple, list)):
-        for straw in haystack:  # We're all farmers here.
-            if straw == needle:
+    for haystack_item in haystack:
+        # Using in as a substring (This is not so useful, Should
+        # we just make users use a regex?)
+        if string.isstring(haystack_item):
+            if unicode(needle) in string.string(haystack_item):
                 return Result(True, ())
 
-        return Result(False, ())
-
-    # If haystack is not a repeating value, but it is iterable then it must
-    # have originated from outside EFILTER. Lets try to do the right thing and
-    # delegate to Python.
-    for straw in haystack:
-        return Result(needle in straw, None)
+        elif haystack_item == needle:
+            return Result(True, ())
 
     return Result(False, ())
 
 
 @solve.implementation(for_type=ast.RegexFilter)
 def solve_regexfilter(expr, vars):
-    string = __solve_for_scalar(expr.string, vars)
-    pattern = __solve_for_scalar(expr.regex, vars)
+    """A Regex filter which can operate on both strings and repeated.
 
-    return Result(re.compile(pattern).search(six.text_type(string)), ())
+    If any item in the array matches, we return the entire row.
+    """
+    pattern = re.compile(solve(expr.regex, vars).value, re.I)
+    string_ = solve(expr.string, vars).value
+    if repeated.isrepeating(string_):
+        for item in string_:
+            match = pattern.search(six.text_type(str(item)))
+            if match:
+                return Result(match, ())
+
+    else:
+        match = pattern.search(six.text_type(str(string_)))
+        if match:
+            return Result(match, ())
+
+    return Result(False, ())
+
+
+def _lt(x, y):
+    if ordered.isordered(x):
+        return ordered.lt(x, y)
+    elif ordered.isordered(y):
+        return not ordered.lt(y, x)
+
+    # Non orderable filter should return False.
+    return False
+
+
+def _is_monotonic(elements, inc=True, strict=False):
+    """Is the sequence in elements monotonically increasing?
+
+    Args: inc: Direction of monotonicity (increasing or decreasing).
+          strict: If true elements may not repeat.
+    """
+    last = None
+    for i, element in enumerate(elements):
+        if i == 0:
+            last = element
+            continue
+
+        # Strict monotonic means this element can not be equal to
+        # the last one.
+        if eq.eq(element, last):
+            if strict:
+                return False
+            continue
+
+        if inc and _lt(element, last):
+            return False
+
+        if not inc and _lt(last, element):
+            return False
+
+    return True
 
 
 @solve.implementation(for_type=ast.StrictOrderedSet)
 def solve_strictorderedset(expr, vars):
-    iterator = iter(expr.children)
-    min_ = __solve_for_scalar(next(iterator), vars)
+    iterators = convert_to_iterators(expr, vars, pad=0)
+    # Add each element individually.
+    result = []
+    for elements in zip(*iterators):
+        result.append(_is_monotonic(elements, strict=True))
 
-    if min_ is None:
-        return Result(False, ())
-
-    for child in iterator:
-        val = __solve_for_scalar(child, vars)
-
-        try:
-            if not min_ > val or val is None:
-                return Result(False, ())
-        except TypeError:
-            raise errors.EfilterTypeError(expected=type(min_),
-                                          actual=type(val),
-                                          root=child,
-                                          query=expr.source,)
-
-        min_ = val
-
-    return Result(True, ())
+    return Result(result, ())
 
 
 @solve.implementation(for_type=ast.PartialOrderedSet)
 def solve_partialorderedset(expr, vars):
-    iterator = iter(expr.children)
-    min_ = __solve_for_scalar(next(iterator), vars)
+    iterators = convert_to_iterators(expr, vars, pad=0)
+    # Add each element individually.
+    result = []
+    for elements in zip(*iterators):
+        result.append(_is_monotonic(elements, strict=False))
 
-    if min_ is None:
-        return Result(False, ())
-
-    for child in iterator:
-        val = __solve_for_scalar(child, vars)
-
-        try:
-            if min_ < val or val is None:
-                return Result(False, ())
-        except TypeError:
-            raise errors.EfilterTypeError(expected=type(min_),
-                                          actual=type(val),
-                                          root=child,
-                                          query=expr.source)
-
-        min_ = val
-
-    return Result(True, ())
+    return Result(result, ())

@@ -34,41 +34,11 @@ def apply(applicative, args, kwargs):
     raise NotImplementedError()
 
 
-def reflect_return(applicative):
-    if isinstance(applicative, type):
-        return reflect_static_return(applicative)
-
-    return reflect_runtime_return(applicative)
-
-
-def reflect_args(applicative):
-    if isinstance(applicative, type):
-        return reflect_static_args(applicative)
-
-    return reflect_runtime_args(applicative)
-
-
-@dispatch.class_multimethod
-def reflect_static_args(applicative_cls):
-    raise NotImplementedError()
-
-
 @dispatch.multimethod
-def reflect_runtime_args(applicative):
-    return reflect_static_args(type(applicative))
-
-
-@dispatch.class_multimethod
-def reflect_static_return(applicative_cls):
-    raise NotImplementedError()
-
-
-@dispatch.multimethod
-def reflect_runtime_return(applicative):
-    return reflect_static_return(type(applicative))
+def isapplicative(x):
+    return isinstance(x, IApplicative)
 
 
 class IApplicative(protocol.Protocol):
     _required_functions = (apply,)
-    _optional_functions = (reflect_static_return, reflect_runtime_return,
-                           reflect_static_args, reflect_runtime_args)
+    _optional_functions = ()

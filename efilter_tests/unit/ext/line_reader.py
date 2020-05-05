@@ -18,6 +18,7 @@
 EFILTER test suite.
 """
 
+from builtins import next
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter_tests import testlib
@@ -44,14 +45,6 @@ class LazyFileReadersTest(testlib.EfilterTestCase):
             iterator2 = iter(reader)
 
             self.assertEqual(next(iterator), next(iterator2))
-
-    def testEq(self):
-        """Test value_eq on LazyLineReader."""
-        baseline = repeated.meld("Alice\n", "Bob\n", "Charlie\n", "Dave\n",
-                                 "Eve\n", "Frank")
-        with open(testlib.get_fixture_path("names.txt"), "r") as fd:
-            reader = line_reader.LazyLineReader(fd)
-            self.assertValuesEqual(baseline, reader)
 
     def testCloseInDestructor(self):
         fd = open(testlib.get_fixture_path("names.txt"), "r")

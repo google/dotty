@@ -18,11 +18,54 @@
 EFILTER lexical scope container.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import protocol
 
+from efilter.protocols import repeated
 from efilter.protocols import structured
+
+
+class Scope(dict):
+    def __init__(self, other):
+        super(dict, self).__init__()
+
+        if not protocol.implements(other, structured.IStructured):
+            raise TypeError("Can only set scope from IStructured.")
+
+        # Copy the scope locally.
+        for key in structured.getmembers_runtime(other):
+            self[key] = structured.resolve(other, key)
+
+
+def scope_reflect_runtime_member(scope, name):
+    try:
+        member = scope[name]
+
+        # For repeated values we take the type of the first
+        # element. This is not great :-(. If Rekall returns a None for
+        # the first element then this will fail.
+        if repeated.isrepeating(member):
+            for x in member:
+                return type(x)
+
+        return member
+
+    except KeyError:
+        return protocol.AnyType()
+
+
+# Lets us pretend that dicts are objects, which makes it easy for users to
+# declare variables.
+structured.IStructured.implement(
+    for_type=Scope,
+    implementations={
+        structured.resolve: lambda d, m: d[m],
+        structured.getmembers_runtime: lambda d: list(d.keys()),
+        structured.reflect_runtime_member: scope_reflect_runtime_member,
+    }
+)
 
 
 class ScopeStack(object):
@@ -58,10 +101,12 @@ class ScopeStack(object):
         for scope in scopes:
             if isinstance(scope, type(self)):
                 flattened_scopes.extend(scope.scopes)
+            elif isinstance(scope, Scope):
+                flattened_scopes.append(scope)
             elif isinstance(scope, type):
-                flattened_scopes.append(scope)
+                flattened_scopes.append(Scope(scope))
             elif protocol.implements(scope, structured.IStructured):
-                flattened_scopes.append(scope)
+                flattened_scopes.append(Scope(scope))
             else:
                 raise TypeError("Scopes must be instances or subclasses of "
                                 "IStructured; got %r." % (scope,))
@@ -161,7 +206,7 @@ class ScopeStack(object):
                 else:
                     result = structured.reflect_runtime_member(scope, name)
 
-                if result is not None:
+                if result not in (None, protocol.AnyType):
                     return result
 
             except (NotImplementedError, KeyError, AttributeError):

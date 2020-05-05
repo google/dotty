@@ -1,8 +1,9 @@
 # EFILTER Query Language
 
-EFILTER is a general purpose query language designed to be embedded in Python applications and libraries. It supports SQL-like syntax to filter your application's data and provides a convenient way to directly search through the objects your applications manages.
-
-A second use case for EFILTER is to translate queries from one query language to another, such as from SQL to OpenIOC and so on. A basic SQL-like syntax and a POC lisp implementation are included with the language, and others are relatively simple to add.
+EFILTER is a general purpose query language designed to be embedded in
+Python applications and libraries. It supports SQL-like syntax to
+filter your application's data and provides a convenient way to
+directly search through the objects your applications manages.
 
 ## Projects using EFILTER:
 
@@ -88,9 +89,10 @@ Several sample projects are provided.
 
 Copyright 2015 Google Inc. All Rights Reserved
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0).
+Licensed under the Apache License, Version 2.0 (the "License"); you
+may not use this file except in compliance with the License.  You may
+obtain a copy of the License at
+[http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -98,6 +100,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
+## Rekall's Efilter fork.
+
+This fork of EFilter is a refactored and cleaned up version of EFilter
+adapted specifically to work within Rekall's plugin system. It is
+maintained at https://github.com/rekall-innovations/efilter
+
+
+
 ## Contributors
 
 [Adam Sindelar](https://github.com/the80srobot)
+[Michael Cohen](https://github.com/scudette)

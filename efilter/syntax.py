@@ -31,7 +31,7 @@ class Syntax(six.with_metaclass(abc.ABCMeta, object)):
     FRONTENDS = {}
     FORMATTERS = {}
 
-    def __init__(self, original, params=None):
+    def __init__(self, original, params=None, scope=None):
         """Create a syntax parser for this dialect.
 
         Arguments:
@@ -44,6 +44,7 @@ class Syntax(six.with_metaclass(abc.ABCMeta, object)):
         super(Syntax, self).__init__()
         self.params = params
         self.original = original
+        self.scope = scope
 
     @abc.abstractproperty
     def root(self):

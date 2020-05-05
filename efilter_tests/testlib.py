@@ -18,15 +18,15 @@
 EFILTER test helpers.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import os
+import sys
 import subprocess
 import unittest
 
 from efilter import protocol
-
-from efilter.ext import row_tuple
 
 from efilter.protocols import repeated
 
@@ -42,10 +42,9 @@ def get_fixture_path(name):
 
 class EfilterTestCase(unittest.TestCase):
     def runPythonScript(self, script_path, args=()):
-        cmd = [os.path.join(os.getcwd(), script_path)]
+        cmd = [sys.executable, os.path.join(os.getcwd(), script_path)]
         cmd.extend(args)
         proc = subprocess.Popen(args=cmd,
-                                env={"PYTHONPATH": os.getcwd()},
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()
@@ -73,8 +72,6 @@ class EfilterTestCase(unittest.TestCase):
             for x in seq:
                 if isinstance(x, dict):
                     yield sorted(x.items())
-                elif isinstance(x, row_tuple.RowTuple):
-                    yield sorted(x.ordered_dict.items())
                 else:
                     yield x
 

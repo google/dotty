@@ -84,8 +84,10 @@ class Parser(syntax.Syntax):
     last_param = 0
     tokens = None
 
-    def __init__(self, original, params=None):
+    def __init__(self, original, params=None, scope=None):
         super(Parser, self).__init__(original)
+        self.scope = scope
+        self.aliases = []
 
         self.tokens = token_stream.TokenStream(
             tokenizer.LazyTokenizer(self.original))
@@ -220,6 +222,10 @@ class Parser(syntax.Syntax):
                         end=self.tokens.matched.first.end))
 
         if self.tokens.accept(common_grammar.symbol):
+            name = self.tokens.matched.value
+            if self.aliases and name in self.aliases[-1]:
+                return self.aliases[-1][name]
+
             return ast.Var(self.tokens.matched.value, source=self.original,
                            start=self.tokens.matched.start,
                            end=self.tokens.matched.end)
@@ -241,9 +247,9 @@ class Parser(syntax.Syntax):
 
             if len(expressions) == 1:
                 return expressions[0]
-            else:
-                return ast.Repeat(*expressions, source=self.original,
-                                  start=start, end=self.tokens.matched.end)
+
+            return ast.Repeat(*expressions, source=self.original,
+                              start=start, end=self.tokens.matched.end)
 
         if self.tokens.accept(common_grammar.lbracket):
             return self.list()
@@ -255,8 +261,8 @@ class Parser(syntax.Syntax):
             return self.error(
                 "Was not expecting %r here." % self.tokens.peek(0).name,
                 start_token=self.tokens.peek(0))
-        else:
-            return self.error("Unexpected end of input.")
+
+        return self.error("Unexpected end of input.")
 
     def let(self):
         saved_start = self.tokens.matched.start
@@ -338,7 +344,6 @@ class Parser(syntax.Syntax):
         operators. A mixfix operator in DottySQL consists of an infix part
         and a suffix (they are still binary, they just have a terminator).
         """
-
         # Spin as long as the next token is an operator of higher
         # precedence. (This may not do anything, which is fine.)
         while self.accept_operator(precedence=min_precedence):
@@ -391,16 +396,21 @@ class Parser(syntax.Syntax):
 
     def select(self):
         """First part of an SQL query."""
-        # Try to match the asterisk, any or list of vars.
-        if self.tokens.accept(grammar.select_any):
-            return self.select_any()
+        self.aliases.append({})
 
-        if self.tokens.accept(grammar.select_all):
-            # The FROM after SELECT * is required.
-            self.tokens.expect(grammar.select_from)
-            return self.select_from()
+        try:
+            # Try to match the asterisk, any or list of vars.
+            if self.tokens.accept(grammar.select_any):
+                return self.select_any()
 
-        return self.select_what()
+            if self.tokens.accept(grammar.select_all):
+                # The FROM after SELECT * is required.
+                self.tokens.expect(grammar.select_from)
+                return self.select_from()
+
+            return self.select_what()
+        finally:
+            self.aliases.pop(-1)
 
     def select_any(self):
         saved_match = self.tokens.matched
@@ -479,13 +489,19 @@ class Parser(syntax.Syntax):
                                              start=self.tokens.matched.start,
                                              end=self.tokens.matched.end,
                                              source=self.original)
+
+                # Record the value expression of the alias.
+                self.aliases[-1][self.tokens.matched.value] = value_expression
+
                 used_names.add(self.tokens.matched.value)
             else:
                 # Try to guess the appropriate name of the column based on what
                 # the expression is.
                 name = self._guess_name_of(value_expression)
 
-                if not name or name in used_names:
+                if (not name or
+                        name in used_names or
+                        (self.scope and name in self.scope)):
                     # Give up and just use the current idx for key.
                     name = "column_%d" % (idx,)
                 else:

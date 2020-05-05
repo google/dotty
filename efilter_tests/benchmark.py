@@ -18,6 +18,7 @@
 EFILTER test helpers.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import cProfile

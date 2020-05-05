@@ -18,6 +18,7 @@
 This module implements a parser that manages tokenizer output based on rules.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 from efilter import errors
@@ -105,7 +106,7 @@ class TokenStream(object):
             return match
 
         try:
-            func_name = f.func_name
+            func_name = f.__name__
         except AttributeError:
             func_name = "<unnamed grammar function>"
 

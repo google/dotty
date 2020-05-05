@@ -149,8 +149,10 @@ class ObjectFilterSyntax(syntax.Syntax):
                          infix=grammar.Token("symbol", ".")),
     ]
 
-    def __init__(self, original, params=None):
+    def __init__(self, original, params=None, scope=None):
         super(ObjectFilterSyntax, self).__init__(original)
+        self.scope = scope
+
         if params is not None:
             raise ValueError("ObjectFilterSyntax doesn't support parameters.")
 

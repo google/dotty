@@ -57,6 +57,9 @@ plus = Operator(
     ...)
 """
 
+from builtins import next
+from builtins import range
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import collections
@@ -326,6 +329,7 @@ def match_tokens(expected_tokens):
     elif isinstance(expected_tokens, tuple):
         # Match multiple tokens.
         match_len = len(expected_tokens)
+
         def _grammar_func(tokens):
             upcoming = tuple(itertools.islice(tokens, match_len))
             if upcoming == expected_tokens:

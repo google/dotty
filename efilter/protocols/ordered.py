@@ -23,51 +23,37 @@ import six
 from efilter import dispatch
 from efilter import protocol
 
+if six.PY3:
+    long = int
+
+
 # Declarations:
 # pylint: disable=unused-argument
 
-
-def ordered(collection, key_func=None):
-    if callable(key_func):
-        def key_for_sorted(x):
-            return assortkey(key_func(x))
-
-    else:
-        key_for_sorted = assortkey
-
-    return sorted(collection, key=key_for_sorted)
-
-
 @dispatch.multimethod
-def assortkey(x):
+def lt(lhs, rhs):
     raise NotImplementedError()
 
 
 class IOrdered(protocol.Protocol):
-    _required_functions = (assortkey,)
+    _required_functions = (lt, )
+
+
+def isordered(element):
+    return isinstance(element, IOrdered)
 
 
 # Default implementations:
-
-IOrdered.implement(
-    for_type=protocol.AnyType,
-    implementations={
-        assortkey: lambda x: x
-    }
-)
-
-
-IOrdered.implement(
-    for_type=dict,
-    implementations={
-        assortkey: lambda x: ordered(six.iteritems(x))
-    }
-)
-
-
 IOrdered.implement(
     for_type=type(None),
     implementations={
-        assortkey: lambda _: 0
+        lt: lambda x, y: False
+    }
+)
+
+IOrdered.implement(
+    for_types=(int, long, float,),
+    implementations={
+        lt: lambda x, y: x < y
     }
 )

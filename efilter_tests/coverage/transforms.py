@@ -24,10 +24,8 @@ from efilter import ast
 
 from efilter.transforms import asdottysql
 from efilter.transforms import aslisp
-from efilter.transforms import infer_type
 from efilter.transforms import normalize
 from efilter.transforms import solve
-from efilter.transforms import validate
 
 from efilter_tests import testlib
 
@@ -51,14 +49,8 @@ class TransformCoverageTest(testlib.EfilterTestCase):
     def testAsLispCoverage(self):
         self.assertASTCoverage(aslisp.aslisp)
 
-    def testInferTypeCoverage(self):
-        self.assertASTCoverage(infer_type.infer_type)
-
     def testNormalizeCoverage(self):
         self.assertASTCoverage(normalize.normalize)
 
     def testSolveCoverage(self):
         self.assertASTCoverage(solve.solve)
-
-    def testValidateCoverage(self):
-        self.assertASTCoverage(validate.validate)

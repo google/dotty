@@ -22,12 +22,15 @@ as the base classes TypedFunction and LibraryModule, which are used to represent
 stdlib functions and modules.
 """
 
+from builtins import next
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 
 import itertools
-import six
 import threading
+
+import six
 
 from efilter import protocol
 
@@ -39,10 +42,10 @@ from efilter.protocols import structured
 
 
 class TypedFunction(object):
-    """Represents an EFILTER-callable function with reflection support.
+    """Represents an EFILTER-callable function.
 
     Each function in the standard library is an instance of a subclass of
-    this class. Subclasses override __call__ and the reflection API.
+    this class. Subclasses override __call__.
     """
     name = None
 
@@ -51,14 +54,6 @@ class TypedFunction(object):
 
     def __call__(self):
         raise NotImplementedError()
-
-    @classmethod
-    def reflect_static_args(cls):
-        return itertools.repeat(protocol.AnyType)
-
-    @classmethod
-    def reflect_static_return(cls):
-        return protocol.AnyType
 
 
 applicative.IApplicative.implicit_dynamic(TypedFunction)
@@ -79,14 +74,6 @@ class TypedReducer(object):
 
     def __call__(self, data, chunk_size=None):
         return reducer.reduce(self, data, chunk_size)
-
-    @classmethod
-    def reflect_static_args(cls):
-        return (repeated.IRepeated,)
-
-    @classmethod
-    def reflect_static_return(cls):
-        return protocol.AnyType
 
     # IReducer
 
@@ -172,13 +159,10 @@ class LibraryModule(object):
         return "LibraryModule(name=%r, vars=%r)" % (self.name, self.vars)
 
     def getmembers_runtime(self):
-        return self.vars.keys()
+        return list(self.vars.keys())
 
     def resolve(self, name):
         return self.vars[name]
-
-    def reflect_runtime_member(self, name):
-        return type(self.vars[name])
 
 
 structured.IStructured.implicit_static(LibraryModule)
@@ -193,13 +177,6 @@ class First(TypedFunction):
         for value in repeated.getvalues(x):
             return value
 
-    @classmethod
-    def reflect_static_args(cls):
-        return (repeated.IRepeated,)
-
-    @classmethod
-    def reflect_static_return(cls):
-        return protocol.AnyType
 
 
 class Take(TypedFunction):
@@ -235,14 +212,6 @@ class Take(TypedFunction):
 
         return repeated.lazy(_generator)
 
-    @classmethod
-    def reflect_static_args(cls):
-        return (int, repeated.IRepeated)
-
-    @classmethod
-    def reflect_static_return(cls):
-        return repeated.IRepeated
-
 
 class Drop(TypedFunction):
     """Drop the first 'count' elements from 'x' (tuple or IRepeated).
@@ -277,14 +246,6 @@ class Drop(TypedFunction):
 
         return repeated.lazy(_generator)
 
-    @classmethod
-    def reflect_static_args(cls):
-        return (int, repeated.IRepeated)
-
-    @classmethod
-    def reflect_static_return(cls):
-        return repeated.IRepeated
-
 
 class Lower(TypedFunction):
     """Make a string lowercase."""
@@ -293,14 +254,6 @@ class Lower(TypedFunction):
 
     def __call__(self, x):
         return x.lower()
-
-    @classmethod
-    def reflect_static_args(cls):
-        return (six.string_types[0],)
-
-    @classmethod
-    def reflect_static_return(cls):
-        return six.string_types[0]
 
 
 class Find(TypedFunction):
@@ -311,32 +264,15 @@ class Find(TypedFunction):
     def __call__(self, string, needle):
         return string.find(needle)
 
-    @classmethod
-    def reflect_static_args(cls):
-        return (six.string_types[0], six.string_types[0])
-
-    @classmethod
-    def reflect_static_return(cls):
-        return int
 
 
-class Count(TypedReducer):
+class Count(TypedFunction):
     """Counts the number of elements in a tuple or of values in a repeated."""
 
     name = "count"
 
-    def fold(self, chunk):
+    def __call__(self, chunk):
         return counted.count(chunk)
-
-    def merge(self, left, right):
-        return left + right
-
-    def finalize(self, intermediate):
-        return intermediate
-
-    @classmethod
-    def reflect_static_return(cls):
-        return int
 
 
 class Reverse(TypedFunction):
@@ -350,14 +286,6 @@ class Reverse(TypedFunction):
 
         return repeated.meld(*reversed(repeated.getvalues(x)))
 
-    @classmethod
-    def reflect_static_args(cls):
-        return (repeated.IRepeated,)
-
-    @classmethod
-    def reflect_static_return(cls):
-        return repeated.IRepeated
-
 
 class Materialize(TypedFunction):
     """Force a repeated value (e.g. output of map) to materialize in memory."""
@@ -366,14 +294,6 @@ class Materialize(TypedFunction):
 
     def __call__(self, rv):
         return repeated.repeated(*list(rv))
-
-    @classmethod
-    def reflect_static_args(cls):
-        return (repeated.IRepeated,)
-
-    @classmethod
-    def reflect_static_return(cls):
-        return repeated.IRepeated
 
 
 MODULE = LibraryModule(name="stdcore",

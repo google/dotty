@@ -23,6 +23,7 @@ syntaxes are frontends that translate into this AST, which is what is actually
 interpretted.
 """
 
+from builtins import object
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import six
@@ -79,7 +80,7 @@ class Expression(object):
         self.source = kwargs.pop("source", None)
 
         if kwargs:
-            raise ValueError("Unexpected argument(s) %s" % kwargs.keys())
+            raise ValueError("Unexpected argument(s) %s" % list(kwargs.keys()))
 
         if self.arity and len(children) != self.arity:
             raise ValueError("%d-ary expression %s passed %d children." % (
@@ -216,13 +217,6 @@ class Resolve(BinaryExpression):
     @property
     def member(self):
         return self.rhs
-
-
-class IsInstance(BinaryExpression):
-    """Evaluates to True if the current scope is an instance of type."""
-
-    type_signature = (protocol.AnyType, type)
-    return_signature = bool
 
 
 class Cast(BinaryExpression):

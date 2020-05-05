@@ -17,46 +17,39 @@
 # limitations under the License.
 
 """EFILTER abstract type system."""
+from __future__ import division
+
+from past.utils import old_div
+import six
 
 from efilter import dispatch
 from efilter import protocol
+
 
 # Declarations:
 # pylint: disable=unused-argument
 
 
 @dispatch.multimethod
-def eq(x, y):
-    """The default simply refers back to python's own comparator."""
-    try:
-        return x == y
-    except TypeError:
-        # If the python comparator fails the values are not equal.
-        return False
+def string(x):
+    """Return a stringified representation."""
+    raise NotImplementedError()
+
+
+class IString(protocol.Protocol):
+    _required_functions = (string,)
 
 
 @dispatch.multimethod
-def ne(x, y):
-    return not eq(x, y)
-
-
-class IEq(protocol.Protocol):
-    _required_functions = (eq, )
-    _optional_functions = (ne, )
+def isstring(x):
+    """Optional: Is x a string?"""
+    return isinstance(x, IString)
 
 
 # Default implementations:
-def _robust_cb(cb, *args, **kwargs):
-    try:
-        cb(*args, **kwargs)
-    except TypeError:
-        return False
-
-
-# Lists are compared sorted so we dont care about their order.
-IEq.implement(
-    for_types=(list, tuple),
+IString.implement(
+    for_types=six.string_types,
     implementations={
-        eq: _robust_cb(lambda x, y: sorted(x) == sorted(y)),
+        string: lambda x: x
     }
 )

@@ -18,6 +18,7 @@
 EFILTER DottySQL syntax output.
 """
 
+from builtins import next
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 import six
@@ -166,7 +167,7 @@ def asdottysql(expr):
                           lspace="")
 
 
-@asdottysql.implementation(for_types=(ast.IsInstance, ast.RegexFilter,
+@asdottysql.implementation(for_types=(ast.RegexFilter,
                                       ast.Membership))
 def asdottysql(expr):
     return _format_binary(expr.lhs, expr.rhs,
