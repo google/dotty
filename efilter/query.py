@@ -39,6 +39,7 @@ def guess_source_syntax(source):
     return None
 
 
+@six.python_2_unicode_compatible
 class Query(object):
     source = None
     root = None
@@ -108,10 +109,7 @@ class Query(object):
             self.source = formatter(self.root)
 
     def __str__(self):
-        return unicode(self)
-
-    def __unicode__(self):
-        return unicode(self.source)
+        return str(self.source)
 
     def __repr__(self):
         return "Query(%s)" % repr(self.source)
